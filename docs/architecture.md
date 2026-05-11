@@ -23,6 +23,8 @@ Building an AI message routing system that reads messages from a chatbot and dis
 
 ## Architecture — the five processing layers
 
+### High-level flow
+
 ```
 Requester
     ↓
@@ -41,6 +43,76 @@ WebSocket / SSE response channel → Requester
 
 Every message carries a `correlation_id` that threads through all layers for end-to-end tracing.
 
+### End-to-end request sequence
+
+The diagram below is the canonical reference for "what runs in what order" through a single request. Key invariants to read off it: the raw message exists only briefly inside the Orchestrator (steps 9–10), redaction happens once and uniformly (step 10), every downstream layer sees only the redacted `PipelineEnvelope`, and the audit + vault cleanup runs in a `finally` block regardless of success or failure.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant APIGW as API Gateway
+    participant Auth as Lambda Authoriser
+    participant SQSIn as SQS incoming
+    participant Orch as Orchestrator
+    participant Pres as Presidio sidecar
+    participant Vault as Redis vault
+    participant Bouncer
+    participant Classifier
+    participant Strategist
+    participant Adapter as Vendor Adapter
+    participant Bedrock
+    participant Audit as DynamoDB audit
+    participant WS as WebSocket
+
+    Client->>APIGW: POST /chat (Bearer JWT, raw message)
+    APIGW->>Auth: validate JWT against Cognito JWKS
+    alt JWT invalid
+        Auth-->>APIGW: 401
+        APIGW-->>Client: 401 Unauthorized
+    else JWT valid
+        Auth-->>APIGW: user_sub, claims
+        APIGW->>SQSIn: enqueue (user_sub, raw, source_ip)
+        APIGW-->>Client: 202 Accepted (correlation_id)
+    end
+
+    SQSIn-->>Orch: dequeue message
+
+    Note over Orch: set correlation_id ContextVar<br/>(threads all downstream logs and spans)
+
+    Orch->>Pres: POST /anonymize (raw message)
+    Pres-->>Orch: redacted_message, entity_types, tokens
+    Orch->>Vault: SET vault key → original value (TTL 5min)
+
+    Note over Orch: Build PipelineEnvelope.<br/>Raw message now hashed.<br/>Never leaves Orchestrator from here on.
+
+    Orch->>Bouncer: PipelineEnvelope
+    Bouncer-->>Orch: BounceResult (allowed=true)
+
+    Orch->>Classifier: PipelineEnvelope + BounceResult
+    Classifier-->>Orch: ClassifiedIntent
+
+    Orch->>Strategist: PipelineEnvelope + ClassifiedIntent
+    Strategist-->>Orch: RoutingPlan
+
+    Orch->>Adapter: redacted_message + RoutingPlan
+    Adapter->>Bedrock: InvokeModelWithResponseStream (inference profile)
+    Bedrock-->>Adapter: stream chunks (redacted)
+
+    loop streaming
+        Adapter->>Orch: chunk (still redacted)
+        Orch->>Vault: GET token values for this chunk
+        Vault-->>Orch: original entity values
+        Note over Orch: Leak detector scans restored chunk.<br/>Strips unexpected PII before send.
+        Orch->>WS: chunk (restored)
+        WS-->>Client: SSE chunk
+    end
+
+    Note over Orch: finally block — runs on success AND failure
+    Orch->>Audit: write entity_types, counts, vendor, latency<br/>NEVER values. NEVER raw message.
+    Orch->>Vault: DEL vault keys (eager cleanup)
+```
+
 ---
 
 ## Layer 1 — Bouncer
@@ -58,6 +130,68 @@ Every message carries a `correlation_id` that threads through all layers for end
 - 200ms total timeout → fail open (allow downstream, log warning)
 
 **Tools**: No MCP tools. The Bouncer relies solely on the rule gate and Haiku's own safety assessment.
+
+### Sequence
+
+Read this diagram before writing Bouncer code. **The fail-open posture is the one most often coded wrong** — the natural instinct on timeout is to raise and reject, but the spec requires allowing the request through with `timed_out=true`. The `option` branches of the `critical` block below show every non-happy path resolving to `allowed=true`. The only path that hard-blocks the user is rule-gate rejection (banned user, prompt injection, rate limit) — Haiku errors and timeouts never block.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Orch as Orchestrator
+    participant Gate as Rule Gate (in-process)
+    participant Haiku as Haiku micro-classifier
+    participant Bedrock as Bedrock (Haiku)
+    participant Redis
+    participant Metrics as CloudWatch
+
+    Note over Orch,Metrics: 200ms TOTAL budget for rule gate + Haiku.<br/>Spec: this layer FAILS OPEN, never fails closed.
+
+    Orch->>Gate: PipelineEnvelope
+    activate Gate
+
+    Note right of Gate: Length, prompt-injection regex,<br/>banned-user check, rate limit.<br/>No LLM. Microseconds.
+
+    Gate->>Redis: GET banned:{user_sub}, ratelimit:{user_sub}
+    Redis-->>Gate: status
+
+    alt Rule gate REJECTS
+        Gate-->>Orch: BounceResult(allowed=false, layer=rule_gate)
+        deactivate Gate
+        Note over Orch: short-circuit — Haiku not called
+    else Rule gate PASSES
+        deactivate Gate
+        Orch->>Haiku: redacted_message + remaining budget
+        activate Haiku
+
+        critical Haiku call must complete within remaining budget
+            Haiku->>Bedrock: InvokeModel (apac.* inference profile, max_tokens=50)
+            Bedrock-->>Haiku: {pass, reason, confidence}
+
+            alt confidence >= 0.7 AND pass = true
+                Haiku-->>Orch: BounceResult(allowed=true, layer=llm_classifier)
+            else confidence < 0.7
+                Haiku-->>Orch: BounceResult(allowed=true, escalate=true)
+                Note over Orch: also writes Review Log entry<br/>(async, DynamoDB)
+            end
+
+        option Budget exceeded (timeout)
+            Note over Haiku,Bedrock: FAIL OPEN — do not raise, do not reject.
+            Haiku-->>Orch: BounceResult (see note)
+            Note right of Orch: allowed=true<br/>timed_out=true<br/>layer=timeout_fail_open<br/>confidence=0.0
+            Haiku->>Metrics: BouncerTimeout += 1
+
+        option Bedrock error
+            Note over Haiku,Bedrock: FAIL OPEN — same posture as timeout.
+            Haiku-->>Orch: BounceResult (see note)
+            Note right of Orch: allowed=true<br/>timed_out=false<br/>layer=timeout_fail_open<br/>confidence=0.0
+            Haiku->>Metrics: BouncerError += 1
+        end
+        deactivate Haiku
+    end
+
+    Note over Orch: ANY result above continues the pipeline.<br/>The only path that blocks the user is rule gate hard-reject.
+```
 
 ---
 

@@ -108,6 +108,7 @@ These checks run on every PR. Don't bypass them.
 ## 7. Per-layer gotchas
 
 ### Bouncer
+- **Sequence**: see `docs/architecture.md` §"Layer 1 — Bouncer" → "Sequence". Read it before writing Bouncer code; the fail-open posture is the easiest thing to get wrong.
 - The 200ms is the **total** budget across rule gate + Haiku, not per-stage. Rule gate must finish in single-digit ms.
 - Fail-open on timeout. The `BounceResult.timed_out` field is `True`, `allowed` is also `True`, and a CloudWatch metric `BouncerTimeout` is incremented.
 - Banned-user check uses `user_sub`, never email.
@@ -134,6 +135,7 @@ These checks run on every PR. Don't bypass them.
 - Streaming is enabled by default. Non-streaming is a flag on the adapter call, not a separate code path.
 
 ### Orchestrator
+- **Sequence**: see `docs/architecture.md` §"Architecture — the five processing layers" → "End-to-end request sequence". This is the canonical "what runs in what order" for the whole pipeline.
 - `correlation_id` is set in `orchestrator/sqs_consumer.py` as the very first action when a message is dequeued. Every downstream call inherits it via `ContextVar`.
 - `PipelineEnvelope` is constructed once, after redaction, and is immutable thereafter. If a layer needs to add metadata, it returns a new envelope or a sibling result object.
 - Audit logging happens in a `finally` block so it runs on both success and failure paths.

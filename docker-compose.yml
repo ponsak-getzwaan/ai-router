@@ -1,0 +1,95 @@
+# -----------------------------------------------------------------------------
+# Local dev stack for the AI Router project.
+#
+# Spins up the dependencies the Orchestrator and the layers need to run on a
+# laptop without touching real AWS:
+#   - LocalStack:  SQS, DynamoDB, Cognito (best-effort), Lambda
+#   - Redis:       token vault + session history (matches ElastiCache shape)
+#   - Presidio:    the same image we deploy as the sidecar, so dev parity is real
+#
+# Notes:
+#   - Bedrock is NOT mocked. There is no faithful local Bedrock. Layers that
+#     call Bedrock should be tested against the sandbox AWS account; for unit
+#     tests, mock the boto3 client directly. See docs/architecture.md and
+#     CLAUDE.md §9.
+#   - This file is for the developer loop. Production runs on ECS Fargate.
+# -----------------------------------------------------------------------------
+
+services:
+  # ---------------------------------------------------------------------------
+  # LocalStack — SQS, DynamoDB, Cognito, Lambda emulation
+  # ---------------------------------------------------------------------------
+  localstack:
+    image: localstack/localstack:3.5
+    container_name: airouter-localstack
+    ports:
+      - "4566:4566"  # main edge port
+    environment:
+      SERVICES: "sqs,dynamodb,cognito-idp,lambda,iam,sts,cloudwatch,logs"
+      DEBUG: "0"
+      AWS_DEFAULT_REGION: "ap-southeast-1"
+      LS_LOG: "warn"
+      # Persist data across restarts within the dev session
+      PERSISTENCE: "1"
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------------------------------------------------------------------------
+  # Redis — token vault, session cache, user context cache
+  # Matches the data model of ElastiCache Redis in production.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    container_name: airouter-redis
+    ports:
+      - "6379:6379"
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      # Reject unknown commands explicitly — production parity
+      - "--appendonly"
+      - "no"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Presidio sidecar — same container as production deployment.
+  # Exposes /anonymize and /restore over HTTP.
+  # See docs/adr/0002-presidio-as-sidecar.md for why this is a separate service.
+  # ---------------------------------------------------------------------------
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    container_name: airouter-presidio-analyzer
+    ports:
+      - "5002:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    container_name: airouter-presidio-anonymizer
+    ports:
+      - "5001:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  localstack-data:

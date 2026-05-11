@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv / pip
+.uv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# Type / lint caches
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!example.tfvars
+
+# AWS / local data
+.aws/
+localstack-data/
+
+# Logs
+*.log
+logs/
+
+# Editor scratch
+TODO.local.md
+NOTES.local.md

@@ -1,0 +1,1 @@
+{"description": "UEN standard 8-digit format", "input": "UEN: 12345678A", "expected": [{"entity_type": "SG_UEN", "value": "12345678A"}]}

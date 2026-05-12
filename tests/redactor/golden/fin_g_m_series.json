@@ -1,0 +1,1 @@
+{"description": "FIN G and M series", "input": "First G1234567C, second M9876543D", "expected": [{"entity_type": "SG_FIN", "value": "G1234567C"}, {"entity_type": "SG_FIN", "value": "M9876543D"}]}

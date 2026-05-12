@@ -1,0 +1,1 @@
+{"description": "Multiple entity types in one message", "input": "NRIC S1234567A, FIN F9876543Z, UEN 12345678A", "expected": [{"entity_type": "SG_NRIC", "value": "S1234567A"}, {"entity_type": "SG_FIN", "value": "F9876543Z"}, {"entity_type": "SG_UEN", "value": "12345678A"}]}

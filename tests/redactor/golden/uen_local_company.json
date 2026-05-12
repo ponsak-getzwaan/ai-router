@@ -1,0 +1,1 @@
+{"description": "UEN local company 9-digit format", "input": "Company UEN 123456789B", "expected": [{"entity_type": "SG_UEN", "value": "123456789B"}]}

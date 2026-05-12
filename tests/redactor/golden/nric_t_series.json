@@ -1,0 +1,1 @@
+{"description": "NRIC T-series", "input": "NRIC number T7654321B", "expected": [{"entity_type": "SG_NRIC", "value": "T7654321B"}]}

@@ -1,0 +1,1 @@
+{"description": "NRIC S-series in natural text", "input": "My NRIC is S1234567A.", "expected": [{"entity_type": "SG_NRIC", "value": "S1234567A"}]}

@@ -1,0 +1,1 @@
+{"description": "Singapore passport E-series", "input": "Passport no. E1234567K", "expected": [{"entity_type": "SG_PASSPORT", "value": "E1234567K"}]}

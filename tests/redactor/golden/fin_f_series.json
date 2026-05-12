@@ -1,0 +1,1 @@
+{"description": "FIN F-series foreign resident", "input": "Employee FIN: F9876543Z", "expected": [{"entity_type": "SG_FIN", "value": "F9876543Z"}]}

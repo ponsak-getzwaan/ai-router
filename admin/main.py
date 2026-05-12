@@ -1,13 +1,72 @@
-"""Admin dashboard — read-heavy; write surfaces: routing rules, escalation queue, tier overrides.
+"""Admin dashboard FastAPI application.
 
-Phase 1: minimal health endpoint. Full dashboard is a separate task.
+Starts shared service instances on lifespan and attaches them to app.state
+so routers can retrieve them via request.app.state.
+
+Write surfaces: routing rule editor, escalation queue actions, tier overrides.
+IAM role denies: bedrock:*, sqs:SendMessage (incoming queue), dynamodb:DeleteItem.
 """
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-app = FastAPI(title="admin")
+from admin.config import AdminConfig
+from admin.routers import audit, escalations, health, metrics, routing_rules, test_console
+from admin.services.cloudwatch import CloudWatchService
+from admin.services.dynamo_admin import DynamoAdminService
+from admin.services.redis_admin import RedisAdminService
+from admin.services.sqs_admin import SQSAdminService
+from shared.logging import configure, safe_log
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    cfg = AdminConfig()
+    configure()
+
+    redis = RedisAdminService(cfg.redis_url)
+    await redis.connect()
+
+    application.state.config = cfg
+    application.state.cloudwatch = CloudWatchService(cfg.cloudwatch_namespace, cfg.aws_region)
+    application.state.dynamo = DynamoAdminService(
+        routing_table=cfg.dynamodb_routing_table,
+        audit_table=cfg.dynamodb_audit_table,
+        region=cfg.aws_region,
+    )
+    application.state.sqs_admin = SQSAdminService(
+        escalation_url=cfg.sqs_escalation_url,
+        review_table=cfg.dynamodb_review_table,
+        region=cfg.aws_region,
+        visibility_seconds=cfg.sqs_escalation_visibility_seconds,
+    )
+    application.state.redis = redis
+
+    safe_log.info("admin.started", service_name="admin")
+    yield
+
+    await redis.close()
+    safe_log.info("admin.stopped", service_name="admin")
+
+
+app = FastAPI(
+    title="AI Router Admin",
+    description="Operational dashboard — monitoring, escalation review, routing configuration.",
+    lifespan=lifespan,
+)
+
+app.include_router(health.router)
+app.include_router(metrics.router)
+app.include_router(escalations.router)
+app.include_router(routing_rules.router)
+app.include_router(audit.router)
+app.include_router(test_console.router)
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+async def root_health() -> dict[str, str]:
     return {"status": "ok", "service": "admin"}

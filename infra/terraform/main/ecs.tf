@@ -201,3 +201,57 @@ resource "aws_ecs_service" "pipeline" {
 
   depends_on = [aws_iam_role_policy.pipeline_service]
 }
+
+# ---------------------------------------------------------------------------
+# Admin dashboard
+# ---------------------------------------------------------------------------
+
+resource "aws_ecs_task_definition" "admin" {
+  family                   = "${var.project}-admin"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.service_cpu
+  memory                   = var.service_memory
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.admin.arn
+
+  container_definitions = jsonencode([{
+    name      = "admin"
+    image     = "${aws_ecr_repository.services["admin"].repository_url}:latest"
+    essential = true
+    environment = [
+      { name = "ADMIN_AWS_REGION", value = var.aws_region },
+      { name = "ADMIN_ENVIRONMENT", value = var.environment },
+      { name = "ADMIN_REDIS_URL", value = local.redis_url },
+      { name = "ADMIN_SQS_ESCALATION_URL", value = aws_sqs_queue.escalation.url },
+      { name = "ADMIN_DYNAMODB_ROUTING_TABLE", value = aws_dynamodb_table.routing_rules.name },
+      { name = "ADMIN_DYNAMODB_AUDIT_TABLE", value = aws_dynamodb_table.audit_log.name },
+      { name = "ADMIN_DYNAMODB_REVIEW_TABLE", value = aws_dynamodb_table.review_log.name },
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "admin"
+      }
+    }
+    portMappings = [{ containerPort = 8000, protocol = "tcp" }]
+  }])
+}
+
+resource "aws_ecs_service" "admin" {
+  name            = "${var.project}-admin"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.admin.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = false
+  }
+
+  depends_on = [aws_iam_role_policy.admin]
+}

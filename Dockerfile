@@ -28,6 +28,7 @@ COPY classifier/ ./classifier/
 COPY strategist/ ./strategist/
 COPY adapters/ ./adapters/
 COPY orchestrator/ ./orchestrator/
+COPY admin/ ./admin/
 
 ARG SERVICE
 ENV SERVICE=${SERVICE}

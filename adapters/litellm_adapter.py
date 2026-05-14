@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncIterator
 
-import litellm  # type: ignore[import-untyped]
+import litellm
 
 from shared.errors import BedrockError, BedrockTimeout
 from shared.logging import safe_log
@@ -20,7 +20,7 @@ from shared.models import PipelineEnvelope, RoutingPlan
 
 # LiteLLM needs AWS credentials from the environment (boto3 default chain).
 # We disable its verbose logging to keep structlog the single log source.
-litellm.set_verbose = False
+litellm.set_verbose = False  # type: ignore[attr-defined]
 litellm.drop_params = True  # ignore unknown params silently
 
 

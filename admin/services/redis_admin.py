@@ -21,10 +21,10 @@ _FORBIDDEN_PREFIXES = ("vault:",)
 class RedisAdminService:
     def __init__(self, redis_url: str) -> None:
         self._url = redis_url
-        self._client: aioredis.Redis | None = None  # type: ignore[type-arg]
+        self._client: aioredis.Redis | None = None
 
     async def connect(self) -> None:
-        self._client = aioredis.from_url(self._url, decode_responses=True)
+        self._client = aioredis.from_url(self._url, decode_responses=True)  # type: ignore[no-untyped-call]
 
     async def close(self) -> None:
         if self._client:
@@ -52,7 +52,7 @@ class RedisAdminService:
             try:
                 cursor = 0
                 while True:
-                    cursor, keys = await self._client.scan(  # type: ignore[misc]
+                    cursor, keys = await self._client.scan(
                         cursor=cursor,
                         match="vault:*",
                         count=100,

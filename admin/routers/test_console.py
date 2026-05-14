@@ -73,7 +73,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         try:
             # Use the admin's Redis connection; test console uses a distinct user_sub
             # so it won't interfere with production rate limit keys.
-            redis_client: aioredis.Redis = aioredis.from_url(  # type: ignore[type-arg]
+            redis_client: aioredis.Redis = aioredis.from_url(  # type: ignore[no-untyped-call]
                 request.app.state.config.redis_url
             )
             bouncer_cfg = BouncerConfig()
@@ -100,7 +100,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
                 outcome={"error_type": type(exc).__name__},
             ))
             safe_log.warning("admin.test_console.bouncer_error", error_type=type(exc).__name__)
-            bounce = None  # type: ignore[assignment]
+            bounce = None
 
         # --- Classifier ---
         t0 = time.monotonic()

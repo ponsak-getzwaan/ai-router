@@ -106,4 +106,5 @@ class VendorSelector:
             return vendor
         except (BedrockError, KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
             safe_log.warning("strategist.haiku.error", error_type=type(exc).__name__)
-            return _INTENT_TO_VENDOR.get(intent.intent, self._config.default_vendor)
+            default: str = self._config.default_vendor
+            return _INTENT_TO_VENDOR.get(intent.intent, default)

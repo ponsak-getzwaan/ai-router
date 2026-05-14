@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import aioboto3  # type: ignore[import-untyped]
 
@@ -29,7 +29,7 @@ def _window(period_minutes: int) -> tuple[datetime, datetime]:
 
 
 def _safe_sum(datapoints: list[dict[str, Any]]) -> float:
-    return sum(d.get("Sum", d.get("SampleCount", 0.0)) for d in datapoints)
+    return float(sum(d.get("Sum", d.get("SampleCount", 0.0)) for d in datapoints))
 
 
 def _safe_avg(datapoints: list[dict[str, Any]]) -> float | None:
@@ -69,7 +69,7 @@ class CloudWatchService:
                     Period=period_seconds,
                     Statistics=[stat],
                 )
-                return resp.get("Datapoints", [])
+                return cast(list[dict[str, Any]], resp.get("Datapoints", []))
         except Exception as exc:
             safe_log.warning(
                 "admin.cloudwatch.error",

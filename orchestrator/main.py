@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _consumer
 
     bedrock = get_bedrock_runtime()
-    redis: aioredis.Redis = aioredis.from_url(_config.redis_url, decode_responses=False)
+    redis: aioredis.Redis = aioredis.from_url(_config.redis_url, decode_responses=False)  # type: ignore[no-untyped-call]
 
     presidio = PresidioClient(_config.presidio_url, _config.presidio_timeout_s)
     bouncer = Bouncer(BouncerConfig(), redis, bedrock)

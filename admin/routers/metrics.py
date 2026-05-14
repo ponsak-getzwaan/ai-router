@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, Query, Request
 
 from admin.models import BouncerMetrics, ClassifierMetrics, PipelineMetrics, RedactionMetrics
@@ -11,7 +13,7 @@ router = APIRouter(prefix="/admin/metrics", tags=["metrics"])
 
 
 def _cw(request: Request) -> CloudWatchService:
-    return request.app.state.cloudwatch
+    return cast(CloudWatchService, request.app.state.cloudwatch)
 
 
 @router.get("/pipeline", response_model=PipelineMetrics)

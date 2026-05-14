@@ -10,6 +10,8 @@ Previews show only the redacted message. Vault tokens are never surfaced.
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/admin/escalations", tags=["escalations"])
 
 
 def _svc(request: Request) -> SQSAdminService:
-    return request.app.state.sqs_admin
+    return cast(SQSAdminService, request.app.state.sqs_admin)
 
 
 class _RequeueBody(BaseModel):

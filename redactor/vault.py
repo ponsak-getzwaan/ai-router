@@ -26,7 +26,7 @@ def _vault_key(correlation_id: UUID, token: str) -> str:
 class TokenVault:
     """Redis-backed vault for VAULT_* token → original value mappings."""
 
-    def __init__(self, redis: aioredis.Redis, ttl_seconds: int = 300) -> None:  # type: ignore[type-arg]
+    def __init__(self, redis: aioredis.Redis, ttl_seconds: int = 300) -> None:
         self._redis = redis
         self._ttl = ttl_seconds
 

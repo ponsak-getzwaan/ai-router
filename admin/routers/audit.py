@@ -7,7 +7,7 @@ step 10: "NEVER values. NEVER raw message."
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Query, Request
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/admin/audit", tags=["audit"])
 
 
 def _svc(request: Request) -> DynamoAdminService:
-    return request.app.state.dynamo
+    return cast(DynamoAdminService, request.app.state.dynamo)
 
 
 @router.get("", response_model=AuditQuery)

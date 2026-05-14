@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import aioboto3  # type: ignore[import-untyped]
-from boto3.dynamodb.conditions import Key  # type: ignore[import-untyped]
+from boto3.dynamodb.conditions import Key
 
 from admin.models import AuditQuery, AuditRecord, RoutingRule, RoutingRuleUpdate
 from shared.logging import safe_log

@@ -10,6 +10,8 @@ reads DynamoDB at routing time with a short TTL cache.
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, HTTPException, Request
 
 from admin.models import RoutingRule, RoutingRuleUpdate
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/admin/routing-rules", tags=["routing-rules"])
 
 
 def _svc(request: Request) -> DynamoAdminService:
-    return request.app.state.dynamo
+    return cast(DynamoAdminService, request.app.state.dynamo)
 
 
 @router.get("", response_model=list[RoutingRule])

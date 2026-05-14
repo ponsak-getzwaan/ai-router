@@ -78,7 +78,7 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Mypy
-        run: uv run mypy shared
+        run: uv run mypy --strict bouncer classifier strategist redactor orchestrator shared
 
   # ---------------------------------------------------------------------------
   # Job 3: Test (unit + integration via LocalStack/fakeredis)
@@ -106,6 +106,9 @@ jobs:
 
       - name: Run tests (excluding aws-marked)
         run: uv run pytest -m "not aws" --cov --cov-report=term-missing
+
+      - name: Per-module coverage gates
+        run: uv run python scripts/check_coverage.py
 
       - name: Upload coverage
         if: always()

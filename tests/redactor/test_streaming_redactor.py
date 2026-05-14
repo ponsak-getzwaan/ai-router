@@ -115,6 +115,14 @@ async def test_token_in_flush_is_restored(vault: TokenVault) -> None:
     assert token not in flushed
 
 
+async def test_flush_empty_buffer_returns_empty_string(vault: TokenVault) -> None:
+    cid = uuid4()
+    sr = StreamingRedactor(vault, cid)
+    # Never fed anything — flush on an empty buffer must return ""
+    result = await sr.flush()
+    assert result == ""
+
+
 async def test_buffer_constants_are_correct() -> None:
     assert BUFFER_SIZE == 200
     assert SAFETY_MARGIN == 50

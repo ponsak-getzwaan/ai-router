@@ -7,7 +7,7 @@ optional ``client`` parameter added to InputRedactor for testability.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import fakeredis.aioredis as fakeredis
@@ -137,6 +137,34 @@ async def test_http_error_propagates(vault: TokenVault) -> None:
 
     with pytest.raises(httpx.HTTPStatusError):
         await redactor.redact("text", cid)
+
+
+async def test_no_injected_client_creates_own_client(vault: TokenVault) -> None:
+    """When client=None, InputRedactor opens its own httpx.AsyncClient per call."""
+    cid = uuid4()
+    sidecar_response = {
+        "redacted_text": "Hello",
+        "entity_types": [],
+        "entity_count": 0,
+        "tokens": {},
+    }
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock(return_value=None)
+    mock_response.json = MagicMock(return_value=sidecar_response)
+
+    mock_inner = AsyncMock()
+    mock_inner.post = AsyncMock(return_value=mock_response)
+
+    mock_cm = MagicMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_inner)
+    mock_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("redactor.input_redactor.httpx.AsyncClient", return_value=mock_cm):
+        redactor = InputRedactor("http://presidio.internal:8080", vault)  # no client=
+        result = await redactor.redact("Hello", cid)
+
+    assert result.was_redacted is False
+    mock_inner.post.assert_called_once()
 
 
 async def test_correlation_id_sent_to_sidecar(vault: TokenVault) -> None:

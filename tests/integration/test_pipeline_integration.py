@@ -13,17 +13,15 @@ Uses:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 
 from shared.errors import PresidioError
-from shared.models import BounceResult, BouncerLayer
 from tests.integration.conftest import (
     make_bounce_result,
     make_intent_result,
-    make_redaction_result,
     make_routing_plan,
 )
 
@@ -111,7 +109,9 @@ class TestPipelineBouncerBlock:
         )
         assert "cannot be processed" in result.lower()
 
-    async def test_bouncer_block_skips_classifier(self, driver, mock_bouncer, mock_classifier) -> None:
+    async def test_bouncer_block_skips_classifier(
+        self, driver, mock_bouncer, mock_classifier
+    ) -> None:
         mock_bouncer.bounce = AsyncMock(
             return_value=make_bounce_result(allowed=False, reason="content_policy")
         )
@@ -124,7 +124,9 @@ class TestPipelineBouncerBlock:
         )
         mock_classifier.classify.assert_not_called()
 
-    async def test_bouncer_block_skips_strategist(self, driver, mock_bouncer, mock_strategist) -> None:
+    async def test_bouncer_block_skips_strategist(
+        self, driver, mock_bouncer, mock_strategist
+    ) -> None:
         mock_bouncer.bounce = AsyncMock(
             return_value=make_bounce_result(allowed=False, reason="banned_user")
         )
@@ -184,7 +186,9 @@ class TestPipelineClassifierEscalation:
         )
         assert "human review" in result.lower()
 
-    async def test_escalation_skips_strategist(self, driver, mock_classifier, mock_strategist) -> None:
+    async def test_escalation_skips_strategist(
+        self, driver, mock_classifier, mock_strategist
+    ) -> None:
         mock_classifier.classify = AsyncMock(return_value=make_intent_result(escalate=True))
         await driver.run(
             raw_message=RAW_MESSAGE,

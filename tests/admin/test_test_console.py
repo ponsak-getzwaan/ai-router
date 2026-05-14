@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from tests.admin.conftest import AdminCtx
 
 
@@ -145,7 +143,7 @@ class TestTestConsolePipelineFlow:
                 "/admin/test-console",
                 json={"redacted_message": "What is VAULT_3A4B?"},
             )
-        layer_names = [l["layer"] for l in resp.json()["layers"]]
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "bouncer" in layer_names
         assert "classifier" in layer_names
 
@@ -159,7 +157,7 @@ class TestTestConsolePipelineFlow:
                 "/admin/test-console",
                 json={"redacted_message": "What is VAULT_3A4B?"},
             )
-        layer_names = [l["layer"] for l in resp.json()["layers"]]
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "bouncer" in layer_names
         assert "classifier" not in layer_names
         assert "strategist" not in layer_names
@@ -171,7 +169,7 @@ class TestTestConsolePipelineFlow:
                 "/admin/test-console",
                 json={"redacted_message": "What is VAULT_3A4B?"},
             )
-        layer_names = [l["layer"] for l in resp.json()["layers"]]
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "classifier" in layer_names
 
     async def test_strategist_skipped_when_classifier_escalates(self, ctx: AdminCtx) -> None:
@@ -181,7 +179,7 @@ class TestTestConsolePipelineFlow:
                 "/admin/test-console",
                 json={"redacted_message": "What is VAULT_3A4B?"},
             )
-        layer_names = [l["layer"] for l in resp.json()["layers"]]
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "strategist" not in layer_names
 
     async def test_dry_run_false_adds_skipped_adapter_layer(self, ctx: AdminCtx) -> None:
@@ -192,9 +190,9 @@ class TestTestConsolePipelineFlow:
                 "/admin/test-console",
                 json={"redacted_message": "What is VAULT_3A4B?", "dry_run": False},
             )
-        layer_names = [l["layer"] for l in resp.json()["layers"]]
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "adapter" in layer_names
-        adapter = next(l for l in resp.json()["layers"] if l["layer"] == "adapter")
+        adapter = next(lyr for lyr in resp.json()["layers"] if lyr["layer"] == "adapter")
         assert "skipped" in adapter["outcome"]
 
     async def test_bouncer_error_continues_with_error_type(self, ctx: AdminCtx) -> None:
@@ -215,7 +213,7 @@ class TestTestConsolePipelineFlow:
             )
         assert resp.status_code == 200
         bouncer_layer = next(
-            (l for l in resp.json()["layers"] if l["layer"] == "bouncer"), None
+            (lyr for lyr in resp.json()["layers"] if lyr["layer"] == "bouncer"), None
         )
         assert bouncer_layer is not None
         assert "error_type" in bouncer_layer["outcome"]

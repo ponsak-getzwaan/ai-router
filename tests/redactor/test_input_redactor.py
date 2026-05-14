@@ -154,7 +154,6 @@ async def test_correlation_id_sent_to_sidecar(vault: TokenVault) -> None:
 
     # Check that post was called with the correlation_id as string
     call_kwargs = client.post.call_args
-    sent_json = call_kwargs.kwargs.get("json") or call_kwargs.args[1] if call_kwargs.args[1:] else call_kwargs.kwargs.get("json")
     # Access the json kwarg from the call
     _, kwargs = call_kwargs
     assert kwargs["json"]["correlation_id"] == str(cid)

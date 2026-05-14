@@ -7,7 +7,7 @@ asyncio_mode=auto means no @pytest.mark.asyncio needed.
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 import pytest

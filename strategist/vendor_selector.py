@@ -2,7 +2,7 @@
 
 Paths (CLAUDE.md §7 Strategist):
   >= 0.85 confidence → deterministic rule lookup (no LLM)
-  0.5 – 0.85         → Haiku arbitration (max 80 tokens)
+  0.5 - 0.85         → Haiku arbitration (max 80 tokens)
   < 0.5              → escalate to human review
 """
 

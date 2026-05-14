@@ -37,7 +37,6 @@ from admin.models import (
     RoutingRule,
 )
 
-
 # ---------------------------------------------------------------------------
 # Default responses — realistic but empty enough to not influence assertions
 # ---------------------------------------------------------------------------
@@ -187,7 +186,8 @@ async def ctx() -> AdminCtx:  # type: ignore[misc]
     )
     mock_sqs.requeue = AsyncMock(
         return_value=EscalationAction(
-            message_id="", action="requeued", correlation_id="esc-cid-001", annotation="needs review"
+            message_id="", action="requeued", correlation_id="esc-cid-001",
+            annotation="needs review"
         )
     )
 

@@ -53,7 +53,7 @@ class TokenVault:
 
         values = await self._redis.mget(*keys)
         restored = text
-        for key_bytes, value_bytes in zip(keys, values):
+        for key_bytes, value_bytes in zip(keys, values, strict=False):
             if value_bytes is None:
                 continue
             token = key_bytes.decode().split(":", 2)[2]

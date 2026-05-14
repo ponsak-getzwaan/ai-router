@@ -13,14 +13,11 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from shared.models import (
     ClassifiedIntent,
     ClassifierPath,
     IntentDomain,
     PipelineEnvelope,
-    RoutingContext,
     RoutingPlan,
     StrategistPath,
 )
@@ -157,7 +154,9 @@ class TestPolicyEngineIntegration:
         """When policy engine modifies the plan, the modified plan is returned."""
         strategist = _make_strategist(_SONNET)
 
-        def mock_policy(plan: RoutingPlan, envelope: PipelineEnvelope, intent: ClassifiedIntent) -> RoutingPlan:
+        def mock_policy(
+            plan: RoutingPlan, envelope: PipelineEnvelope, intent: ClassifiedIntent
+        ) -> RoutingPlan:
             # Return a plan with policy_modified=True and an applied policy
             return RoutingPlan(
                 primary_vendor=plan.primary_vendor,
@@ -203,4 +202,8 @@ class TestRoutingContext:
         plan = await strategist.route(_make_envelope(), _make_intent())
         # Path in the plan before policy engine may change vendor but not path
         # The path comes from the selector result
-        assert plan.path in (StrategistPath.HAIKU_ARBITRATION, StrategistPath.DETERMINISTIC, StrategistPath.ESCALATED)
+        assert plan.path in (
+            StrategistPath.HAIKU_ARBITRATION,
+            StrategistPath.DETERMINISTIC,
+            StrategistPath.ESCALATED,
+        )

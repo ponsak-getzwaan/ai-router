@@ -6,7 +6,10 @@ domain mapping, and field truncation.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -39,10 +42,6 @@ def _bedrock_response(
 
 
 def _make_envelope(message: str = "explain gravity") -> PipelineEnvelope:
-    import hashlib
-    import uuid
-    from datetime import UTC, datetime
-
     return PipelineEnvelope(
         correlation_id=uuid.uuid4(),
         user_sub="test-user-sub",

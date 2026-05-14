@@ -75,7 +75,7 @@ _default_runtime: BedrockRuntime | None = None
 
 def get_bedrock_runtime(region: str = BEDROCK_REGION) -> BedrockRuntime:
     """Return the process-level BedrockRuntime singleton."""
-    global _default_runtime
+    global _default_runtime  # noqa: PLW0603
     if _default_runtime is None:
         _default_runtime = BedrockRuntime(region=region)
     return _default_runtime

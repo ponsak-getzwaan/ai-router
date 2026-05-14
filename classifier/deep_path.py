@@ -72,7 +72,9 @@ class DeepPathClassifier:
             domain = _DOMAIN_MAP.get(intent_str, IntentDomain.AMBIGUOUS)
             confidence: float = max(0.0, min(1.0, float(parsed.get("confidence", 0.0))))
             raw_reasoning: str = str(parsed.get("reasoning", ""))[:500]
-            escalate: bool = bool(parsed.get("escalate", confidence < self._config.escalate_threshold))
+            escalate: bool = bool(
+                parsed.get("escalate", confidence < self._config.escalate_threshold)
+            )
 
             safe_log.info(
                 "classifier.deep_path.verdict",
@@ -93,7 +95,9 @@ class DeepPathClassifier:
             )
 
         except (BedrockError, KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
-            safe_log.warning("classifier.deep_path.error", error_type=type(exc).__name__, escalate=True)
+            safe_log.warning(
+                "classifier.deep_path.error", error_type=type(exc).__name__, escalate=True
+            )
             return ClassifiedIntent(
                 intent="ambiguous",
                 domain=IntentDomain.AMBIGUOUS,

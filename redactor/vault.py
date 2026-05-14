@@ -51,7 +51,7 @@ class TokenVault:
         keys = [_vault_key(correlation_id, token) for token in tokens]
         values = await self._redis.mget(keys)
 
-        for token, value in zip(tokens, values):
+        for token, value in zip(tokens, values, strict=False):
             if value is not None:
                 original = value.decode() if isinstance(value, bytes) else value
                 text = text.replace(token, original, 1)

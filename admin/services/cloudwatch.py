@@ -6,7 +6,6 @@ All values are aggregated (counts, rates, latencies) — no user data.
 
 from __future__ import annotations
 
-import time
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 

@@ -9,8 +9,8 @@ IAM role denies: bedrock:*, sqs:SendMessage (incoming queue), dynamodb:DeleteIte
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 

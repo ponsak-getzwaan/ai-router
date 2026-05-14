@@ -23,7 +23,6 @@ from shared.models import (
     StrategistPath,
 )
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -76,14 +75,14 @@ class FakeStream:
     def __init__(self, contents: list[str]) -> None:
         self._contents = iter(contents)
 
-    def __aiter__(self) -> "FakeStream":
+    def __aiter__(self) -> FakeStream:
         return self
 
     async def __anext__(self) -> MagicMock:
         try:
             text = next(self._contents)
-        except StopIteration:
-            raise StopAsyncIteration
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
         chunk = MagicMock()
         chunk.choices = [MagicMock()]
         chunk.choices[0].delta = MagicMock()
@@ -138,8 +137,6 @@ async def test_invoke_passes_redacted_message() -> None:
     ) as mock_ac:
         await invoke(envelope, plan)
 
-    call_kwargs = mock_ac.call_args
-    messages = call_kwargs.kwargs.get("messages") or call_kwargs.args[0] if call_kwargs.args else call_kwargs.kwargs["messages"]
     # messages is passed as kwarg
     messages = mock_ac.call_args.kwargs["messages"]
     user_msg = next(m for m in messages if m["role"] == "user")
@@ -205,7 +202,7 @@ async def test_invoke_falls_back_on_timeout() -> None:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
         return mock_resp
 
     with patch(
@@ -269,7 +266,7 @@ async def test_invoke_raises_bedrock_timeout_when_timeout() -> None:
 
     with patch(
         "adapters.litellm_adapter.litellm.acompletion",
-        side_effect=asyncio.TimeoutError(),
+        side_effect=TimeoutError(),
     ):
         with pytest.raises(BedrockTimeout):
             await invoke(envelope, plan)
@@ -289,7 +286,7 @@ async def test_invoke_uses_plan_timeout() -> None:
     captured_timeouts: list[float] = []
     original_wait_for = asyncio.wait_for
 
-    async def capturing_wait_for(coro: object, timeout: float) -> object:  # type: ignore[return]
+    async def capturing_wait_for(coro: object, timeout: float) -> object:  # type: ignore[return]  # noqa: ASYNC109
         captured_timeouts.append(timeout)
         return await original_wait_for(coro, timeout)  # type: ignore[arg-type]
 

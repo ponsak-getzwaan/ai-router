@@ -12,12 +12,10 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
-
 from orchestrator.audit import AuditLogger
 from shared.models import (
-    BouncerLayer,
     BounceResult,
+    BouncerLayer,
     ClassifiedIntent,
     ClassifierPath,
     EntityType,
@@ -27,7 +25,6 @@ from shared.models import (
     RoutingPlan,
     StrategistPath,
 )
-
 
 # =============================================================================
 # Helpers / fixtures

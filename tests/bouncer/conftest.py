@@ -21,7 +21,9 @@ class NoOpMetrics:
         pass
 
 
-assert isinstance(NoOpMetrics(), MetricPublisher), "NoOpMetrics must satisfy MetricPublisher protocol"
+assert isinstance(NoOpMetrics(), MetricPublisher), (
+    "NoOpMetrics must satisfy MetricPublisher protocol"
+)
 
 
 @pytest.fixture

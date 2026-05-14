@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-import pytest
-
-from admin.models import EscalationAction, EscalationList, EscalationMessage
+from admin.models import EscalationList
 from tests.admin.conftest import AdminCtx, make_escalation_message
 
 

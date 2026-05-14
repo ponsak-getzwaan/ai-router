@@ -18,7 +18,7 @@ import aioboto3  # type: ignore[import-untyped]
 
 from bouncer.config import BouncerConfig
 from shared.bedrock import BedrockRuntime
-from shared.errors import BedrockError, BedrockTimeout
+from shared.errors import BedrockError
 from shared.logging import safe_log
 from shared.models import BounceResult, BouncerLayer, PipelineEnvelope
 
@@ -75,7 +75,7 @@ class LLMClassifier:
         budget_s = remaining_budget_ms / 1000.0
         try:
             return await asyncio.wait_for(self._invoke(envelope), timeout=budget_s)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             safe_log.warning(
                 "bouncer.haiku.timeout",
                 error_type="TimeoutError",

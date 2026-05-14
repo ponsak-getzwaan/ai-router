@@ -14,7 +14,7 @@ and the orchestrator can poll for approved records in a future iteration.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aioboto3  # type: ignore[import-untyped]
@@ -69,7 +69,9 @@ class SQSAdminService:
 
             raw_messages: list[dict[str, Any]] = resp.get("Messages", [])
             messages = [self._parse_message(m) for m in raw_messages]
-            return EscalationList(messages=[m for m in messages if m is not None], queue_depth=depth)
+            return EscalationList(
+                messages=[m for m in messages if m is not None], queue_depth=depth
+            )
 
         except Exception as exc:
             safe_log.warning("admin.sqs.list_error", error_type=type(exc).__name__)
@@ -81,7 +83,7 @@ class SQSAdminService:
             attrs = raw.get("Attributes", {})
             sent_ts = attrs.get("SentTimestamp")
             sent_at = (
-                datetime.fromtimestamp(int(sent_ts) / 1000, tz=timezone.utc)
+                datetime.fromtimestamp(int(sent_ts) / 1000, tz=UTC)
                 if sent_ts else None
             )
             return EscalationMessage(
@@ -169,7 +171,7 @@ class SQSAdminService:
                 update_expr = "SET #s = :s, reviewed_at = :t"
                 expr_values: dict[str, Any] = {
                     ":s": status,
-                    ":t": datetime.now(timezone.utc).isoformat(),
+                    ":t": datetime.now(UTC).isoformat(),
                 }
                 if annotation:
                     update_expr += ", annotation = :a"

@@ -6,10 +6,10 @@ CloudWatch data (zeros/None rather than crashes).
 
 from __future__ import annotations
 
-import pytest
+from unittest.mock import AsyncMock
 
-from admin.models import BouncerMetrics, ClassifierMetrics, PipelineMetrics, RedactionMetrics
-from tests.admin.conftest import AdminCtx, make_bouncer_metrics, make_classifier_metrics
+from admin.models import BouncerMetrics, LatencyPercentiles, PipelineMetrics
+from tests.admin.conftest import AdminCtx
 
 
 class TestPipelineMetrics:
@@ -42,8 +42,6 @@ class TestPipelineMetrics:
         assert resp.status_code == 422
 
     async def test_none_rates_when_no_traffic(self, ctx: AdminCtx) -> None:
-        from unittest.mock import AsyncMock
-        from admin.models import LatencyPercentiles
         ctx.cloudwatch.pipeline_metrics = AsyncMock(return_value=PipelineMetrics(
             period_minutes=60,
             total_requests=0.0,
@@ -74,7 +72,6 @@ class TestBouncerMetrics:
         ctx.cloudwatch.bouncer_metrics.assert_called_once_with(120)
 
     async def test_zero_total_yields_null_pass_rate(self, ctx: AdminCtx) -> None:
-        from unittest.mock import AsyncMock
         ctx.cloudwatch.bouncer_metrics = AsyncMock(return_value=BouncerMetrics(
             period_minutes=60,
             total=0.0, passed=0.0, rejected=0.0, escalated=0.0,

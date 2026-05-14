@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from admin.models import RoutingRule
 from tests.admin.conftest import AdminCtx, make_routing_rule
 

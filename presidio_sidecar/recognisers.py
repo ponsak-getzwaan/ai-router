@@ -6,7 +6,7 @@ Golden-file tests live in tests/redactor/golden/.
 
 from __future__ import annotations
 
-import re
+from typing import ClassVar
 
 from presidio_analyzer import Pattern, PatternRecognizer  # type: ignore[import-untyped]
 
@@ -14,7 +14,7 @@ from presidio_analyzer import Pattern, PatternRecognizer  # type: ignore[import-
 class SGNRICRecognizer(PatternRecognizer):
     """Singapore NRIC (citizens): starts with S or T."""
 
-    PATTERNS = [
+    PATTERNS: ClassVar[list[Pattern]] = [
         Pattern(
             "SG_NRIC",
             r"\b[ST]\d{7}[A-Z]\b",
@@ -33,7 +33,7 @@ class SGNRICRecognizer(PatternRecognizer):
 class SGFINRecognizer(PatternRecognizer):
     """Singapore FIN (foreign permanent residents): starts with F, G, or M."""
 
-    PATTERNS = [
+    PATTERNS: ClassVar[list[Pattern]] = [
         Pattern(
             "SG_FIN",
             r"\b[FGM]\d{7}[A-Z]\b",
@@ -52,7 +52,7 @@ class SGFINRecognizer(PatternRecognizer):
 class SGUENRecognizer(PatternRecognizer):
     """Singapore UEN (business entity number): 9-10 chars."""
 
-    PATTERNS = [
+    PATTERNS: ClassVar[list[Pattern]] = [
         Pattern(
             "SG_UEN_STANDARD",
             r"\b\d{8}[A-Z]\b",
@@ -76,7 +76,7 @@ class SGUENRecognizer(PatternRecognizer):
 class SGPassportRecognizer(PatternRecognizer):
     """Singapore passport number: E or K + 7 digits + letter."""
 
-    PATTERNS = [
+    PATTERNS: ClassVar[list[Pattern]] = [
         Pattern(
             "SG_PASSPORT",
             r"\b[EK]\d{7}[A-Z]\b",

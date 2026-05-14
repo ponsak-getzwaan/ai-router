@@ -11,7 +11,6 @@ from shared.models import (
     PipelineEnvelope,
     RoutingContext,
     RoutingPlan,
-    StrategistPath,
 )
 from strategist.config import StrategistConfig
 from strategist.policy_engine import apply_policies

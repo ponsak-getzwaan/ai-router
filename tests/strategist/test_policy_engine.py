@@ -10,8 +10,6 @@ import hashlib
 import uuid
 from datetime import UTC, datetime
 
-import pytest
-
 from shared.models import (
     ClassifiedIntent,
     ClassifierPath,

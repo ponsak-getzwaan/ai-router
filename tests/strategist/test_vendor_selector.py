@@ -2,7 +2,7 @@
 
 Three routing paths:
   >= 0.85 → DETERMINISTIC (DynamoDB lookup, then local map)
-  0.5 – 0.85 → HAIKU_ARBITRATION (Bedrock Haiku call)
+  0.5 - 0.85 → HAIKU_ARBITRATION (Bedrock Haiku call)
   < 0.5 → ESCALATED (default vendor, no LLM)
 
 All Bedrock and DynamoDB calls are mocked.
@@ -12,14 +12,14 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from shared.errors import BedrockError
 from shared.models import ClassifiedIntent, ClassifierPath, IntentDomain, StrategistPath
 from strategist.config import StrategistConfig
-from strategist.vendor_selector import VendorSelector, _INTENT_TO_VENDOR
+from strategist.vendor_selector import _INTENT_TO_VENDOR, VendorSelector
 
 # ---------------------------------------------------------------------------
 # Vendor IDs
@@ -122,7 +122,9 @@ class TestPathSelection:
     async def test_confidence_just_at_deterministic_threshold(self, config, bedrock_mock):
         session = _make_dynamo_session({"vendor": _SONNET})
         selector = _make_selector(bedrock_mock, session, config)
-        _vendor, path = await selector.select(_make_intent(confidence=config.deterministic_threshold))
+        _vendor, path = await selector.select(
+            _make_intent(confidence=config.deterministic_threshold)
+        )
         assert path == StrategistPath.DETERMINISTIC
 
     async def test_medium_confidence_uses_haiku_arbitration(self, config, bedrock_mock):

@@ -83,7 +83,7 @@ class SQSConsumer:
             raw_message: str = body.get("message", "")
             user_sub: str = body.get("user_sub", "unknown")
             session_id: str = body.get("session_id", str(correlation_id))
-            source_ip: str = body.get("source_ip", "0.0.0.0")
+            source_ip: str = body.get("source_ip", "0.0.0.0")  # noqa: S104
             tokens: dict[str, str] | None = body.get("tokens")
 
             await self._driver.run(

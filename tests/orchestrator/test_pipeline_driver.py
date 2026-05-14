@@ -8,18 +8,16 @@ asyncio_mode=auto means no @pytest.mark.asyncio needed.
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import fakeredis.aioredis  # type: ignore[import-untyped]
-import pytest
 
 from orchestrator.pipeline_driver import PipelineDriver
 from shared.errors import PresidioError
 from shared.models import (
-    BouncerLayer,
     BounceResult,
+    BouncerLayer,
     ClassifiedIntent,
     ClassifierPath,
     EntityType,
@@ -144,7 +142,7 @@ async def make_driver(
 
 async def test_happy_path_returns_restored_response() -> None:
     """Full pipeline run: token in vendor response is restored."""
-    driver, redis = await make_driver(vendor_response=_VENDOR_RESPONSE_WITH_TOKEN)
+    driver, _redis = await make_driver(vendor_response=_VENDOR_RESPONSE_WITH_TOKEN)
 
     # Pre-store a vault token so restore can replace it
     cid = uuid4()
@@ -170,7 +168,9 @@ async def test_happy_path_returns_restored_response() -> None:
 async def test_happy_path_clean_response_returned_as_is() -> None:
     """Vendor response without vault tokens is returned unchanged."""
     driver, _ = await make_driver(
-        presidio_redaction=make_redaction_result(redacted="Clean input", was_redacted=False, entity_types=(), entity_count=0),
+        presidio_redaction=make_redaction_result(
+            redacted="Clean input", was_redacted=False, entity_types=(), entity_count=0
+        ),
         vendor_response=_VENDOR_RESPONSE_CLEAN,
     )
 

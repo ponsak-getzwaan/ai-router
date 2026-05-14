@@ -36,7 +36,7 @@ _anonymizer: AnonymizerEngine | None = None
 
 @app.on_event("startup")
 async def startup() -> None:
-    global _analyzer, _anonymizer
+    global _analyzer, _anonymizer  # noqa: PLW0603
     _analyzer = AnalyzerEngine()
     for rec in get_singapore_recognizers():
         _analyzer.registry.add_recognizer(rec)

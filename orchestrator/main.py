@@ -7,8 +7,8 @@ The SQS consumer runs as a background asyncio task.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
@@ -35,7 +35,7 @@ _consumer: SQSConsumer | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    global _consumer
+    global _consumer  # noqa: PLW0603
 
     bedrock = get_bedrock_runtime()
     redis: aioredis.Redis = aioredis.from_url(_config.redis_url, decode_responses=False)  # type: ignore[no-untyped-call]

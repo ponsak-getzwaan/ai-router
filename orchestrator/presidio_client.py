@@ -13,10 +13,10 @@ from typing import Any
 
 import httpx
 
+from shared.correlation import get_correlation_id
 from shared.errors import PresidioError
 from shared.logging import safe_log
 from shared.models import EntityType, RedactionResult
-from shared.correlation import get_correlation_id
 
 
 class PresidioClient:
@@ -53,7 +53,7 @@ class PresidioClient:
             EntityType(et) for et in entity_types_raw if et in EntityType.__members__
         )
 
-        raw_hash = hashlib.sha256(raw_message.encode()).hexdigest()
+        hashlib.sha256(raw_message.encode()).hexdigest()
 
         safe_log.info(
             "orchestrator.presidio.anonymized",

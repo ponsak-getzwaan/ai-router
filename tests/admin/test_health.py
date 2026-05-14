@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
-from admin.main import app as admin_app
 from tests.admin.conftest import AdminCtx
 
 

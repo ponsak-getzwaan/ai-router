@@ -10,10 +10,10 @@ stores raw user input. Trace logs are emitted via safe_log (no message text).
 
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Request
@@ -33,7 +33,6 @@ router = APIRouter(prefix="/admin", tags=["test-console"])
 
 
 def _make_envelope(req: TestConsoleRequest, correlation_id: str) -> PipelineEnvelope:
-    import hashlib
     raw_hash = hashlib.sha256(req.redacted_message.encode()).hexdigest()
     return PipelineEnvelope(
         correlation_id=uuid.UUID(correlation_id),
@@ -92,7 +91,9 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
                 },
             ))
             if not bounce.allowed:
-                return _build_response(correlation_id, body.dry_run, layers, None, total_start, None)
+                return _build_response(
+                    correlation_id, body.dry_run, layers, None, total_start, None
+                )
         except Exception as exc:
             layers.append(TestConsoleLayerResult(
                 layer="bouncer",
@@ -153,7 +154,9 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
                     latency_ms=round((time.monotonic() - t0) * 1000, 1),
                     outcome={"error_type": type(exc).__name__},
                 ))
-                safe_log.warning("admin.test_console.strategist_error", error_type=type(exc).__name__)
+                safe_log.warning(
+                    "admin.test_console.strategist_error", error_type=type(exc).__name__
+                )
 
         # Phase 1: always dry_run — vendor adapter not called (IAM denies bedrock:*)
         if not body.dry_run:

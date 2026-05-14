@@ -12,9 +12,8 @@ from uuid import UUID
 
 import httpx
 
-from shared.models import EntityType, RedactionResult
-
 from redactor.vault import TokenVault
+from shared.models import EntityType, RedactionResult
 
 
 class InputRedactor:

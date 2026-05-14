@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -54,7 +54,7 @@ class TestSQSConsumerMessageParsing:
         captured: list[UUID] = []
 
         mock_driver = MagicMock()
-        async def capture_run(**kwargs) -> str:  # noqa: E306
+        async def capture_run(**kwargs) -> str:
             captured.append(get_correlation_id())
             return "ok"
         mock_driver.run = capture_run
@@ -70,7 +70,7 @@ class TestSQSConsumerMessageParsing:
         captured: list[UUID] = []
 
         mock_driver = MagicMock()
-        async def capture_run(**kwargs) -> str:  # noqa: E306
+        async def capture_run(**kwargs) -> str:
             captured.append(get_correlation_id())
             return "ok"
         mock_driver.run = capture_run
@@ -87,7 +87,7 @@ class TestSQSConsumerMessageParsing:
         received: list[str] = []
 
         mock_driver = MagicMock()
-        async def capture(**kwargs) -> str:  # noqa: E306
+        async def capture(**kwargs) -> str:
             received.append(kwargs["user_sub"])
             return "ok"
         mock_driver.run = capture
@@ -101,7 +101,7 @@ class TestSQSConsumerMessageParsing:
         received: list[str] = []
 
         mock_driver = MagicMock()
-        async def capture(**kwargs) -> str:  # noqa: E306
+        async def capture(**kwargs) -> str:
             received.append(kwargs["session_id"])
             return "ok"
         mock_driver.run = capture
@@ -115,7 +115,7 @@ class TestSQSConsumerMessageParsing:
         received: list[str] = []
 
         mock_driver = MagicMock()
-        async def capture(**kwargs) -> str:  # noqa: E306
+        async def capture(**kwargs) -> str:
             received.append(kwargs["source_ip"])
             return "ok"
         mock_driver.run = capture
@@ -177,7 +177,7 @@ class TestSQSConsumerMessageLifecycle:
         original_set = set_correlation_id
 
         mock_driver = MagicMock()
-        async def capture_run(**kwargs) -> str:  # noqa: E306
+        async def capture_run(**kwargs) -> str:
             call_order.append("driver.run")
             return "ok"
         mock_driver.run = capture_run

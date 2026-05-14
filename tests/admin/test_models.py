@@ -6,18 +6,19 @@ and field invariants — independent of any HTTP endpoint behaviour.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
 from admin.models import (
     AuditRecord,
     EscalationMessage,
-    RoutingRule,
     RoutingRuleUpdate,
+)
+from admin.models import (
     TestConsoleRequest as ConsoleRequest,
 )
-
-from datetime import UTC, datetime
 
 
 class TestAuditRecordSchema:

@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-import pytest
-
-from admin.models import AuditQuery, AuditRecord
+from admin.models import AuditQuery
 from tests.admin.conftest import AdminCtx, make_audit_record
 
 

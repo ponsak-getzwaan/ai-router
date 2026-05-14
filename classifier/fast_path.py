@@ -24,6 +24,8 @@ class _Rule:
     confidence: Confidence
 
 
+_ESCALATE_THRESHOLD: float = 0.6
+
 _RULES: tuple[_Rule, ...] = (
     # Code assistance — high signal keywords
     _Rule(
@@ -83,5 +85,5 @@ def classify_fast(
         confidence=best.confidence,
         resolved_message=message,
         path=ClassifierPath.FAST,
-        escalate=best.confidence < 0.6,
+        escalate=best.confidence < _ESCALATE_THRESHOLD,
     )

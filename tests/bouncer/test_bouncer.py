@@ -14,6 +14,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from bouncer.bouncer import Bouncer
+from shared.errors import BedrockError
 from shared.models import BouncerLayer
 from tests.bouncer.conftest import NoOpMetrics, make_envelope
 
@@ -105,8 +106,6 @@ class TestBudgetEnforcement:
         assert result.layer == BouncerLayer.TIMEOUT_FAIL_OPEN
 
     async def test_haiku_bedrock_error_fails_open(self, config, redis):
-        from shared.errors import BedrockError
-
         bedrock_mock = MagicMock()
         bedrock_mock.invoke_model = AsyncMock(side_effect=BedrockError("ServiceUnavailable"))
         bouncer = _make_bouncer(config, redis, bedrock_mock)

@@ -10,7 +10,6 @@ LiteLLM calls Bedrock; Bedrock calls the vendor.
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
 
 import litellm
 
@@ -60,7 +59,7 @@ async def invoke(
                 was_redacted=envelope.was_redacted,
             )
             return response
-        except asyncio.TimeoutError as exc:
+        except TimeoutError:
             safe_log.warning("adapters.vendor.timeout", vendor=vendor, error_type="TimeoutError")
             last_exc = BedrockTimeout("TimeoutError")
         except Exception as exc:

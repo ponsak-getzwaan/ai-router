@@ -17,7 +17,6 @@ from classifier.classifier import Classifier
 from classifier.config import ClassifierConfig
 from shared.models import ClassifiedIntent, ClassifierPath, IntentDomain, PipelineEnvelope
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -96,7 +95,9 @@ class TestFastPathHit:
         bedrock_mock.invoke_model = AsyncMock()
         classifier = Classifier(config, bedrock_mock)
 
-        with patch.object(classifier._deep, "classify", wraps=classifier._deep.classify) as deep_spy:
+        with patch.object(
+            classifier._deep, "classify", wraps=classifier._deep.classify
+        ) as deep_spy:
             await classifier.classify(_make_envelope("debug this python function"))
             deep_spy.assert_not_called()
 

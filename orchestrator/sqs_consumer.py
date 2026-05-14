@@ -67,8 +67,9 @@ class SQSConsumer:
         receipt = message["ReceiptHandle"]
 
         # Set correlation_id as the FIRST action — before any pipeline code.
+        body: dict[str, Any] = {}
         try:
-            body: dict[str, Any] = json.loads(message.get("Body", "{}"))
+            body = json.loads(message.get("Body", "{}"))
             cid_raw = body.get("correlation_id")
             correlation_id: UUID = UUID(cid_raw) if cid_raw else new_correlation_id()
         except (ValueError, KeyError):

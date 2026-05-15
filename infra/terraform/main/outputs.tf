@@ -34,3 +34,33 @@ output "vpc_id" {
 output "private_subnet_ids" {
   value = aws_subnet.private[*].id
 }
+
+output "admin_spa_bucket" {
+  description = "S3 bucket name for the admin SPA — used by the deploy script."
+  value       = aws_s3_bucket.admin_spa.bucket
+}
+
+output "admin_spa_cloudfront_url" {
+  description = "Admin dashboard URL (CloudFront distribution domain)."
+  value       = "https://${aws_cloudfront_distribution.admin_spa.domain_name}"
+}
+
+output "admin_spa_cloudfront_id" {
+  description = "CloudFront distribution ID — needed to invalidate cache after deploy."
+  value       = aws_cloudfront_distribution.admin_spa.id
+}
+
+output "cognito_domain" {
+  description = "Cognito hosted UI domain (used as VITE_COGNITO_DOMAIN)."
+  value       = "https://${aws_cognito_user_pool_domain.admin.domain}.auth.${var.aws_region}.amazoncognito.com"
+}
+
+output "cognito_client_id" {
+  description = "Cognito App Client ID (used as VITE_COGNITO_CLIENT_ID)."
+  value       = aws_cognito_user_pool_client.admin_spa.id
+}
+
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID — for creating admin users with the CLI."
+  value       = aws_cognito_user_pool.admin.id
+}

@@ -17,6 +17,7 @@ from admin.models import (
     LatencyPercentiles,
     PipelineMetrics,
     RedactionMetrics,
+    StrategistMetrics,
 )
 from shared.logging import safe_log
 
@@ -184,6 +185,47 @@ class CloudWatchService:
             deep_path=deep,
             escalated=escalated,
             intent_counts=intent_counts,
+        )
+
+    async def strategist_metrics(self, period_minutes: int = 60) -> StrategistMetrics:
+        start, end = _window(period_minutes)
+        period_s = period_minutes * 60
+
+        async def _sum(metric: str, dims: list[dict[str, str]] | None = None) -> float:
+            pts = await self._get_metric_stats(metric, "Sum", period_s, start, end, dims)
+            return _safe_sum(pts)
+
+        total = await _sum("RequestCount", [{"Name": "Layer", "Value": "strategist"}])
+        policy_blocked = await _sum("PolicyBlocked")
+        fallback_used = await _sum("FallbackUsed")
+        errors = await _sum("StrategistError")
+        deterministic = await _sum(
+            "StrategistPath", [{"Name": "Path", "Value": "deterministic"}]
+        )
+        arbitration = await _sum(
+            "StrategistPath", [{"Name": "Path", "Value": "arbitration"}]
+        )
+
+        # Vendor breakdown — short names emitted by the strategist layer.
+        # These match the Vendor dimension the strategist sets when it calls
+        # CloudWatch: "haiku", "sonnet", "opus".
+        vendor_counts: dict[str, float] = {}
+        for vendor in ("haiku", "sonnet", "opus"):
+            count = await _sum(
+                "VendorSelection", [{"Name": "Vendor", "Value": vendor}]
+            )
+            if count > 0:
+                vendor_counts[vendor] = count
+
+        return StrategistMetrics(
+            period_minutes=period_minutes,
+            total=total,
+            vendor_counts=vendor_counts,
+            policy_blocked=policy_blocked,
+            fallback_used=fallback_used,
+            deterministic_route=deterministic,
+            arbitration_route=arbitration,
+            errors=errors,
         )
 
     async def redaction_metrics(self, period_minutes: int = 60) -> RedactionMetrics:

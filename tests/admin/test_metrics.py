@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from admin.models import BouncerMetrics, LatencyPercentiles, PipelineMetrics
+from admin.models import BouncerMetrics, LatencyPercentiles, PipelineMetrics, StrategistMetrics
 from tests.admin.conftest import AdminCtx
 
 
@@ -94,6 +94,56 @@ class TestClassifierMetrics:
     async def test_period_forwarded(self, ctx: AdminCtx) -> None:
         await ctx.client.get("/admin/metrics/classifier?period_minutes=15")
         ctx.cloudwatch.classifier_metrics.assert_called_once_with(15)
+
+
+class TestStrategistMetrics:
+    async def test_returns_200(self, ctx: AdminCtx) -> None:
+        resp = await ctx.client.get("/admin/metrics/strategist")
+        assert resp.status_code == 200
+
+    async def test_response_shape(self, ctx: AdminCtx) -> None:
+        resp = await ctx.client.get("/admin/metrics/strategist")
+        data = resp.json()
+        assert "total" in data
+        assert "vendor_counts" in data
+        assert isinstance(data["vendor_counts"], dict)
+        assert "policy_blocked" in data
+        assert "fallback_used" in data
+        assert "deterministic_route" in data
+        assert "arbitration_route" in data
+
+    async def test_period_forwarded(self, ctx: AdminCtx) -> None:
+        await ctx.client.get("/admin/metrics/strategist?period_minutes=120")
+        ctx.cloudwatch.strategist_metrics.assert_called_once_with(120)
+
+    async def test_period_below_minimum_returns_422(self, ctx: AdminCtx) -> None:
+        resp = await ctx.client.get("/admin/metrics/strategist?period_minutes=1")
+        assert resp.status_code == 422
+
+    async def test_period_above_maximum_returns_422(self, ctx: AdminCtx) -> None:
+        resp = await ctx.client.get("/admin/metrics/strategist?period_minutes=9999")
+        assert resp.status_code == 422
+
+    async def test_zero_total_returns_empty_vendor_counts(self, ctx: AdminCtx) -> None:
+        from unittest.mock import AsyncMock
+        ctx.cloudwatch.strategist_metrics = AsyncMock(return_value=StrategistMetrics(
+            period_minutes=60,
+            total=0.0,
+            vendor_counts={},
+            policy_blocked=0.0,
+            fallback_used=0.0,
+            deterministic_route=0.0,
+            arbitration_route=0.0,
+            errors=0.0,
+        ))
+        resp = await ctx.client.get("/admin/metrics/strategist")
+        assert resp.status_code == 200
+        assert resp.json()["vendor_counts"] == {}
+
+    async def test_vendor_counts_keys_are_short_names(self, ctx: AdminCtx) -> None:
+        data = (await ctx.client.get("/admin/metrics/strategist")).json()
+        for key in data["vendor_counts"]:
+            assert key in ("haiku", "sonnet", "opus"), f"Unexpected vendor key: {key}"
 
 
 class TestRedactionMetrics:

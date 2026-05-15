@@ -78,6 +78,17 @@ class RedactionMetrics(_Out):
     entity_type_counts: dict[str, float]
 
 
+class StrategistMetrics(_Out):
+    period_minutes: int
+    total: float
+    vendor_counts: dict[str, float]   # short vendor name → selection count
+    policy_blocked: float             # times policy engine vetoed a vendor
+    fallback_used: float              # times fallback vendor was chosen
+    deterministic_route: float        # conf ≥ 0.85 → direct rule lookup
+    arbitration_route: float          # Haiku arbitration used
+    errors: float
+
+
 # ---------------------------------------------------------------------------
 # Escalations
 # ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ from admin.models import (
     PipelineMetrics,
     RedactionMetrics,
     RoutingRule,
+    StrategistMetrics,
 )
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,19 @@ def make_redaction_metrics(period: int = 60) -> RedactionMetrics:
         total_processed=100.0,
         total_entities_redacted=15.0,
         entity_type_counts={"SG_NRIC": 10.0, "CREDIT_CARD": 5.0},
+    )
+
+
+def make_strategist_metrics(period: int = 60) -> StrategistMetrics:
+    return StrategistMetrics(
+        period_minutes=period,
+        total=100.0,
+        vendor_counts={"sonnet": 70.0, "haiku": 25.0, "opus": 5.0},
+        policy_blocked=3.0,
+        fallback_used=8.0,
+        deterministic_route=80.0,
+        arbitration_route=20.0,
+        errors=0.0,
     )
 
 
@@ -161,6 +175,7 @@ async def ctx() -> AdminCtx:  # type: ignore[misc]
     mock_cw.bouncer_metrics = AsyncMock(return_value=make_bouncer_metrics())
     mock_cw.classifier_metrics = AsyncMock(return_value=make_classifier_metrics())
     mock_cw.redaction_metrics = AsyncMock(return_value=make_redaction_metrics())
+    mock_cw.strategist_metrics = AsyncMock(return_value=make_strategist_metrics())
 
     mock_dynamo = MagicMock()
     mock_dynamo.list_routing_rules = AsyncMock(return_value=[make_routing_rule()])

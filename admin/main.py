@@ -12,8 +12,9 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
+from admin.auth import require_cognito_token
 from admin.config import AdminConfig
 from admin.routers import audit, escalations, health, metrics, routing_rules, test_console
 from admin.services.cloudwatch import CloudWatchService
@@ -59,12 +60,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(health.router)
-app.include_router(metrics.router)
-app.include_router(escalations.router)
-app.include_router(routing_rules.router)
-app.include_router(audit.router)
-app.include_router(test_console.router)
+_auth = [Depends(require_cognito_token)]
+
+app.include_router(health.router)  # unprotected — needed for ALB health checks
+app.include_router(metrics.router, dependencies=_auth)
+app.include_router(escalations.router, dependencies=_auth)
+app.include_router(routing_rules.router, dependencies=_auth)
+app.include_router(audit.router, dependencies=_auth)
+app.include_router(test_console.router, dependencies=_auth)
 
 
 @app.get("/health")

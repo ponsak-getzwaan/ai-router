@@ -227,6 +227,8 @@ resource "aws_ecs_task_definition" "admin" {
       { name = "ADMIN_DYNAMODB_ROUTING_TABLE", value = aws_dynamodb_table.routing_rules.name },
       { name = "ADMIN_DYNAMODB_AUDIT_TABLE", value = aws_dynamodb_table.audit_log.name },
       { name = "ADMIN_DYNAMODB_REVIEW_TABLE", value = aws_dynamodb_table.review_log.name },
+      { name = "ADMIN_COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.admin.id },
+      { name = "ADMIN_COGNITO_REGION", value = var.aws_region },
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -253,5 +255,11 @@ resource "aws_ecs_service" "admin" {
     assign_public_ip = false
   }
 
-  depends_on = [aws_iam_role_policy.admin]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.admin.arn
+    container_name   = "admin"
+    container_port   = 8000
+  }
+
+  depends_on = [aws_iam_role_policy.admin, aws_lb_listener.admin_http]
 }

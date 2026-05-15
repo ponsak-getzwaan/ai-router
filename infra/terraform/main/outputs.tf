@@ -60,6 +60,11 @@ output "cognito_client_id" {
   value       = aws_cognito_user_pool_client.admin_spa.id
 }
 
+output "admin_alb_dns" {
+  description = "Admin ALB DNS name (for debugging; normally accessed via CloudFront)."
+  value       = aws_lb.admin.dns_name
+}
+
 output "cognito_user_pool_id" {
   description = "Cognito User Pool ID — for creating admin users with the CLI."
   value       = aws_cognito_user_pool.admin.id

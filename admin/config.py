@@ -27,6 +27,10 @@ class AdminConfig(BaseSettings):
     # CloudWatch namespace
     cloudwatch_namespace: str = Field(default="AIRouter")
 
+    # Cognito — used for JWT validation (no API Gateway authorizer in Phase 1)
+    cognito_user_pool_id: str = Field(default="")
+    cognito_region: str = Field(default="ap-southeast-1")
+
     # Service
     port: int = Field(default=8000)
     environment: str = Field(default="prod")

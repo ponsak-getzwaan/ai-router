@@ -19,11 +19,12 @@ async def health(request: Request) -> ServiceHealth:
     cfg = request.app.state.config
     session: aioboto3.Session = aioboto3.Session()
 
-    # DynamoDB
+    # DynamoDB — Scan with Limit=1 exercises the data path without needing
+    # dynamodb:DescribeTable, which the admin IAM role does not have.
     dynamo_status = "ok"
     try:
         async with session.client("dynamodb", region_name=cfg.aws_region) as ddb:
-            await ddb.describe_table(TableName=cfg.dynamodb_routing_table)
+            await ddb.scan(TableName=cfg.dynamodb_routing_table, Limit=1)
     except Exception as exc:
         safe_log.warning("admin.health.dynamo_error", error_type=type(exc).__name__)
         dynamo_status = "unavailable"

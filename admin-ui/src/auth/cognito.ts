@@ -32,7 +32,7 @@ export async function redirectToLogin(): Promise<void> {
     client_id: CLIENT_ID,
     response_type: "code",
     redirect_uri: REDIRECT_URI,
-    scope: "openid email aws.cognito.signin.user.admin",
+    scope: "openid email profile",
     code_challenge: challenge,
     code_challenge_method: "S256",
     state,

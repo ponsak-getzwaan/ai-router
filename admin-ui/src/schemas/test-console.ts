@@ -1,10 +1,21 @@
 import { z } from "zod";
 
+export const INTENT_DOMAINS = [
+  "code_assistance",
+  "general_qa",
+  "simple_transactional",
+  "out_of_scope",
+  "ambiguous",
+] as const;
+
+export type IntentDomain = (typeof INTENT_DOMAINS)[number];
+
 export const TestConsoleRequestSchema = z.object({
   redacted_message: z.string().min(1).max(4096),
   dry_run: z.boolean().default(true),
   user_sub: z.string().min(1).max(128).default("admin-test-user"),
   session_id: z.string().min(1).max(128).default("admin-test-session"),
+  intent_override: z.string().nullable().optional(),
 });
 
 export const TestConsoleLayerResultSchema = z.object({

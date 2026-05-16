@@ -205,6 +205,14 @@ class TestConsoleRequest(_Out):
         max_length=128,
     )
     session_id: str = Field(default="admin-test-session", min_length=1, max_length=128)
+    intent_override: str | None = Field(
+        default=None,
+        description=(
+            "Skip the Classifier and use this IntentDomain value directly. "
+            "Necessary because admin IAM denies bedrock:* so the Classifier deep "
+            "path (Sonnet) always fails for messages that miss the fast-path heuristics."
+        ),
+    )
 
 
 class TestConsoleLayerResult(_Out):

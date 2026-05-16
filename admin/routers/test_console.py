@@ -25,7 +25,7 @@ from classifier.classifier import Classifier
 from classifier.config import ClassifierConfig
 from shared.bedrock import BedrockRuntime
 from shared.logging import safe_log
-from shared.models import PipelineEnvelope
+from shared.models import ClassifiedIntent, ClassifierPath, IntentDomain, PipelineEnvelope
 from strategist.config import StrategistConfig
 from strategist.strategist import Strategist
 
@@ -107,20 +107,45 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         t0 = time.monotonic()
         intent = None
         try:
-            classifier_cfg = ClassifierConfig()
-            classifier = Classifier(config=classifier_cfg, bedrock=bedrock)
-            intent = await classifier.classify(envelope)
-            layers.append(TestConsoleLayerResult(
-                layer="classifier",
-                latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                outcome={
-                    "intent": intent.intent,
-                    "domain": intent.domain,
-                    "confidence": intent.confidence,
-                    "path": intent.path,
-                    "escalate": intent.escalate,
-                },
-            ))
+            if body.intent_override:
+                # Admin-specified override: bypass Bedrock entirely.
+                # Necessary because admin IAM denies bedrock:* so the deep path
+                # (Sonnet) always fails for messages that miss fast-path heuristics.
+                intent = ClassifiedIntent(
+                    intent=body.intent_override,
+                    domain=IntentDomain(body.intent_override),
+                    confidence=0.90,
+                    resolved_message=envelope.redacted_message,
+                    path=ClassifierPath.FAST,
+                    escalate=False,
+                )
+                layers.append(TestConsoleLayerResult(
+                    layer="classifier",
+                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
+                    outcome={
+                        "intent": intent.intent,
+                        "domain": str(intent.domain),
+                        "confidence": intent.confidence,
+                        "path": str(intent.path),
+                        "escalate": intent.escalate,
+                        "overridden": True,
+                    },
+                ))
+            else:
+                classifier_cfg = ClassifierConfig()
+                classifier = Classifier(config=classifier_cfg, bedrock=bedrock)
+                intent = await classifier.classify(envelope)
+                layers.append(TestConsoleLayerResult(
+                    layer="classifier",
+                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
+                    outcome={
+                        "intent": intent.intent,
+                        "domain": str(intent.domain),
+                        "confidence": intent.confidence,
+                        "path": str(intent.path),
+                        "escalate": intent.escalate,
+                    },
+                ))
         except Exception as exc:
             layers.append(TestConsoleLayerResult(
                 layer="classifier",

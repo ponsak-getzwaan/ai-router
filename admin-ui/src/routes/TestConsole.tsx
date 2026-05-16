@@ -7,6 +7,7 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
+import { INTENT_DOMAINS } from "../schemas/test-console";
 import type { TestConsoleResponse, TestConsoleLayerResult } from "../schemas/test-console";
 
 // ---------------------------------------------------------------------------
@@ -100,7 +101,17 @@ function layerBadge(layer: string, outcome: Record<string, unknown>): ReactEleme
   }
   if (layer === "classifier") {
     const intent = outcome["intent"];
-    if (typeof intent === "string") return <Badge variant="default">{intent}</Badge>;
+    if (typeof intent === "string") {
+      const overridden = outcome["overridden"];
+      return (
+        <span className="flex items-center gap-1.5">
+          <Badge variant="default">{intent}</Badge>
+          {overridden === true && (
+            <Badge variant="warning" className="text-xs">overridden</Badge>
+          )}
+        </span>
+      );
+    }
   }
   if (layer === "strategist") {
     const blocked = outcome["blocked"];
@@ -237,6 +248,7 @@ interface FormValues {
   dry_run: boolean;
   user_sub: string;
   session_id: string;
+  intent_override: string;
   show_overrides: boolean;
 }
 
@@ -259,6 +271,7 @@ export function TestConsole() {
       dry_run: true,
       user_sub: "admin-test-user",
       session_id: "admin-test-session",
+      intent_override: "",
       show_overrides: false,
     },
   });
@@ -268,12 +281,14 @@ export function TestConsole() {
   async function onSubmit(values: FormValues) {
     setResult(null);
     try {
-      const res = await trace.mutateAsync({
+      const payload: Parameters<typeof trace.mutateAsync>[0] = {
         redacted_message: values.redacted_message.trim(),
         dry_run: values.dry_run,
         user_sub: values.user_sub.trim() || "admin-test-user",
         session_id: values.session_id.trim() || "admin-test-session",
-      });
+      };
+      if (values.intent_override) payload.intent_override = values.intent_override;
+      const res = await trace.mutateAsync(payload);
       setResult(res);
     } catch {
       // error available via trace.error
@@ -358,6 +373,28 @@ export function TestConsole() {
 
             {showOverrides && (
               <div className="space-y-3 rounded-md border bg-muted/30 px-3 py-3">
+                {/* Intent override — bypasses Classifier deep path (Bedrock denied) */}
+                <div className="space-y-1">
+                  <Label htmlFor="intent_override" className="text-xs">
+                    Intent override
+                  </Label>
+                  <select
+                    id="intent_override"
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    {...register("intent_override")}
+                  >
+                    <option value="">— let Classifier decide —</option>
+                    {INTENT_DOMAINS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Skip Classifier and use this intent directly. Required when
+                    the fast-path heuristics don&apos;t match (admin IAM denies{" "}
+                    <code className="font-mono">bedrock:*</code>).
+                  </p>
+                </div>
+
                 <div className="space-y-1">
                   <Label htmlFor="user_sub" className="text-xs">user_sub</Label>
                   <Input

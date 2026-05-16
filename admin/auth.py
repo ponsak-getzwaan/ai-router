@@ -34,7 +34,7 @@ _jwks_keys: list[dict[str, Any]] = []
 _jwks_fetched_at: float = 0.0
 _JWKS_TTL_S: float = 3600.0
 
-_bearer = HTTPBearer(auto_error=True)
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _issuer(cfg: AdminConfig) -> str:
@@ -62,9 +62,11 @@ def _public_key(keys: list[dict[str, Any]], kid: str) -> Any:
 
 
 async def require_cognito_token(
-    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
 ) -> dict[str, Any]:
     """FastAPI dependency — validates Cognito access token, returns decoded claims."""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="not_authenticated")
     cfg = _config()
     token = credentials.credentials
 

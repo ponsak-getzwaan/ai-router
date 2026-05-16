@@ -1,61 +1,109 @@
-"""POST /admin/test-console — trace a message through the pipeline.
+"""POST /admin/test-console — send a message through the real pipeline via SQS.
 
-Phase 1: dry_run=True always (admin IAM denies bedrock:* so vendor invocation
-is impossible). The trace runs bouncer → classifier → strategist and returns
-per-layer results with latencies.
+Submits the message to the incoming SQS queue so the Orchestrator processes
+it with its full IAM context (Bedrock, Presidio, CloudWatch metrics).
+Polls the audit DynamoDB table for the result by correlation_id, then
+reconstructs a per-layer trace from the audit record.
 
-The input must be already-redacted text. The test console never receives or
-stores raw user input. Trace logs are emitted via safe_log (no message text).
+Metrics impact: each trace increments real Bouncer/Classifier/Strategist
+CloudWatch metrics — which is the point.
 """
 
 from __future__ import annotations
 
-import hashlib
+import asyncio
+import json
 import time
 import uuid
-from datetime import UTC, datetime
+from typing import Any
 
-import redis.asyncio as aioredis
+import aioboto3  # type: ignore[import-untyped]
 from fastapi import APIRouter, Request
 
 from admin.models import TestConsoleLayerResult, TestConsoleRequest, TestConsoleResponse
-from bouncer.bouncer import Bouncer
-from bouncer.config import BouncerConfig
-from classifier.classifier import Classifier
-from classifier.config import ClassifierConfig
-from shared.bedrock import BedrockRuntime
+from admin.services.dynamo_admin import DynamoAdminService
 from shared.logging import safe_log
-from shared.models import ClassifiedIntent, ClassifierPath, IntentDomain, PipelineEnvelope
-from strategist.config import StrategistConfig
-from strategist.strategist import Strategist
 
 router = APIRouter(prefix="/admin", tags=["test-console"])
 
+_POLL_INTERVAL_S: float = 2.0
+_POLL_TIMEOUT_S: float = 30.0
 
-def _make_envelope(req: TestConsoleRequest, correlation_id: str) -> PipelineEnvelope:
-    raw_hash = hashlib.sha256(req.redacted_message.encode()).hexdigest()
-    return PipelineEnvelope(
-        correlation_id=uuid.UUID(correlation_id),
-        user_sub=req.user_sub,
-        session_id=req.session_id,
-        redacted_message=req.redacted_message,
-        raw_message_hash=raw_hash,
-        entity_types_redacted=(),
-        entity_count=0,
-        was_redacted=False,
-        timestamp=datetime.now(UTC),
-        bedrock_region="ap-southeast-1",
-        source_ip="127.0.0.1",
-    )
+
+async def _send_to_sqs(url: str, region: str, payload: dict[str, Any]) -> None:
+    session: aioboto3.Session = aioboto3.Session()
+    async with session.client("sqs", region_name=region) as sqs:
+        await sqs.send_message(
+            QueueUrl=url,
+            MessageBody=json.dumps(payload),
+        )
+
+
+def _layers_from_audit(record: Any) -> list[TestConsoleLayerResult]:
+    """Reconstruct per-layer trace cards from an AuditRecord."""
+    layers: list[TestConsoleLayerResult] = []
+
+    # Redactor
+    layers.append(TestConsoleLayerResult(
+        layer="redactor",
+        latency_ms=0.0,
+        outcome={
+            "was_redacted": record.was_redacted,
+            "entity_count": record.entity_count,
+            "entity_types": record.entity_types_redacted,
+        },
+    ))
+
+    # Bouncer
+    if record.bouncer_allowed is not None:
+        layers.append(TestConsoleLayerResult(
+            layer="bouncer",
+            latency_ms=0.0,
+            outcome={
+                "allowed": record.bouncer_allowed,
+                "escalate": bool(record.bouncer_escalated),
+                "reason": "see_cloudwatch_logs",
+                "confidence": None,
+                "timed_out": False,
+            },
+        ))
+        if not record.bouncer_allowed:
+            return layers
+
+    # Classifier
+    if record.intent is not None:
+        layers.append(TestConsoleLayerResult(
+            layer="classifier",
+            latency_ms=0.0,
+            outcome={
+                "intent": record.intent,
+                "confidence": record.intent_confidence,
+                "escalate": False,
+            },
+        ))
+
+    # Strategist
+    if record.vendor is not None or record.routing_path is not None:
+        layers.append(TestConsoleLayerResult(
+            layer="strategist",
+            latency_ms=0.0,
+            outcome={
+                "primary_vendor": record.vendor,
+                "path": record.routing_path,
+                "blocked": bool(record.policy_blocked),
+                "policy_modified": False,
+                "applied_policies": [],
+            },
+        ))
+
+    return layers
 
 
 @router.post("/test-console", response_model=TestConsoleResponse)
 async def test_console(body: TestConsoleRequest, request: Request) -> TestConsoleResponse:
+    cfg = request.app.state.config
     correlation_id = str(uuid.uuid4())
-    layers: list[TestConsoleLayerResult] = []
     total_start = time.monotonic()
-    final_vendor: str | None = None
-    error: str | None = None
 
     safe_log.info(
         "admin.test_console.started",
@@ -63,154 +111,79 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         session_id=body.session_id,
     )
 
+    if not cfg.sqs_incoming_url:
+        return TestConsoleResponse(
+            correlation_id=correlation_id,
+            layers=[],
+            final_vendor=None,
+            total_latency_ms=0.0,
+            timed_out=False,
+            error="SQSNotConfigured",
+        )
+
+    # Submit to the real pipeline
     try:
-        envelope = _make_envelope(body, correlation_id)
-        bedrock = BedrockRuntime()
-
-        # --- Bouncer ---
-        t0 = time.monotonic()
-        try:
-            # Use the admin's Redis connection; test console uses a distinct user_sub
-            # so it won't interfere with production rate limit keys.
-            redis_client: aioredis.Redis = aioredis.from_url(  # type: ignore[no-untyped-call]
-                request.app.state.config.redis_url
-            )
-            bouncer_cfg = BouncerConfig()
-            bouncer = Bouncer(config=bouncer_cfg, redis=redis_client, bedrock=bedrock)
-            bounce = await bouncer.bounce(envelope)
-            layers.append(TestConsoleLayerResult(
-                layer="bouncer",
-                latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                outcome={
-                    "allowed": bounce.allowed,
-                    "reason": bounce.reason,
-                    "layer": bounce.layer,
-                    "confidence": bounce.confidence,
-                    "escalate": bounce.escalate,
-                    "timed_out": bounce.timed_out,
-                },
-            ))
-            if not bounce.allowed:
-                return _build_response(
-                    correlation_id, body.dry_run, layers, None, total_start, None
-                )
-        except Exception as exc:
-            layers.append(TestConsoleLayerResult(
-                layer="bouncer",
-                latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                outcome={"error_type": type(exc).__name__},
-            ))
-            safe_log.warning("admin.test_console.bouncer_error", error_type=type(exc).__name__)
-            bounce = None
-
-        # --- Classifier ---
-        t0 = time.monotonic()
-        intent = None
-        try:
-            if body.intent_override:
-                # Admin-specified override: bypass Bedrock entirely.
-                # Necessary because admin IAM denies bedrock:* so the deep path
-                # (Sonnet) always fails for messages that miss fast-path heuristics.
-                intent = ClassifiedIntent(
-                    intent=body.intent_override,
-                    domain=IntentDomain(body.intent_override),
-                    confidence=0.90,
-                    resolved_message=envelope.redacted_message,
-                    path=ClassifierPath.FAST,
-                    escalate=False,
-                )
-                layers.append(TestConsoleLayerResult(
-                    layer="classifier",
-                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                    outcome={
-                        "intent": intent.intent,
-                        "domain": str(intent.domain),
-                        "confidence": intent.confidence,
-                        "path": str(intent.path),
-                        "escalate": intent.escalate,
-                        "overridden": True,
-                    },
-                ))
-            else:
-                classifier_cfg = ClassifierConfig()
-                classifier = Classifier(config=classifier_cfg, bedrock=bedrock)
-                intent = await classifier.classify(envelope)
-                layers.append(TestConsoleLayerResult(
-                    layer="classifier",
-                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                    outcome={
-                        "intent": intent.intent,
-                        "domain": str(intent.domain),
-                        "confidence": intent.confidence,
-                        "path": str(intent.path),
-                        "escalate": intent.escalate,
-                    },
-                ))
-        except Exception as exc:
-            layers.append(TestConsoleLayerResult(
-                layer="classifier",
-                latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                outcome={"error_type": type(exc).__name__},
-            ))
-            safe_log.warning("admin.test_console.classifier_error", error_type=type(exc).__name__)
-
-        # --- Strategist ---
-        if intent is not None and not intent.escalate:
-            t0 = time.monotonic()
-            try:
-                strategist_cfg = StrategistConfig()
-                strategist = Strategist(config=strategist_cfg, bedrock=bedrock)
-                plan = await strategist.route(envelope, intent)
-                final_vendor = plan.primary_vendor if not plan.blocked else None
-                layers.append(TestConsoleLayerResult(
-                    layer="strategist",
-                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                    outcome={
-                        "primary_vendor": plan.primary_vendor,
-                        "path": plan.path,
-                        "blocked": plan.blocked,
-                        "policy_modified": plan.policy_modified,
-                        "applied_policies": list(plan.applied_policies),
-                    },
-                ))
-            except Exception as exc:
-                layers.append(TestConsoleLayerResult(
-                    layer="strategist",
-                    latency_ms=round((time.monotonic() - t0) * 1000, 1),
-                    outcome={"error_type": type(exc).__name__},
-                ))
-                safe_log.warning(
-                    "admin.test_console.strategist_error", error_type=type(exc).__name__
-                )
-
-        # Phase 1: always dry_run — vendor adapter not called (IAM denies bedrock:*)
-        if not body.dry_run:
-            layers.append(TestConsoleLayerResult(
-                layer="adapter",
-                latency_ms=0.0,
-                outcome={"skipped": "vendor invocation disabled in Phase 1 admin context"},
-            ))
-
+        await _send_to_sqs(
+            url=cfg.sqs_incoming_url,
+            region=cfg.aws_region,
+            payload={
+                "message": body.message,
+                "user_sub": body.user_sub,
+                "session_id": body.session_id,
+                "source_ip": "127.0.0.1",
+                "correlation_id": correlation_id,
+            },
+        )
     except Exception as exc:
-        error = type(exc).__name__
-        safe_log.warning("admin.test_console.error", error_type=type(exc).__name__)
+        safe_log.warning("admin.test_console.sqs_error", error_type=type(exc).__name__)
+        return TestConsoleResponse(
+            correlation_id=correlation_id,
+            layers=[],
+            final_vendor=None,
+            total_latency_ms=round((time.monotonic() - total_start) * 1000, 1),
+            timed_out=False,
+            error=type(exc).__name__,
+        )
 
-    return _build_response(correlation_id, body.dry_run, layers, final_vendor, total_start, error)
+    # Poll audit table for the result
+    dynamo: DynamoAdminService = request.app.state.dynamo
+    deadline = time.monotonic() + _POLL_TIMEOUT_S
+    audit_record = None
 
+    while time.monotonic() < deadline:
+        await asyncio.sleep(_POLL_INTERVAL_S)
+        result = await dynamo.query_audit(correlation_id=correlation_id, limit=1)
+        if result.records:
+            audit_record = result.records[0]
+            break
 
-def _build_response(
-    correlation_id: str,
-    dry_run: bool,
-    layers: list[TestConsoleLayerResult],
-    final_vendor: str | None,
-    total_start: float,
-    error: str | None,
-) -> TestConsoleResponse:
+    total_ms = round((time.monotonic() - total_start) * 1000, 1)
+
+    if audit_record is None:
+        safe_log.warning("admin.test_console.timeout", correlation_id=correlation_id)
+        return TestConsoleResponse(
+            correlation_id=correlation_id,
+            layers=[],
+            final_vendor=None,
+            total_latency_ms=total_ms,
+            timed_out=True,
+            error=None,
+        )
+
+    layers = _layers_from_audit(audit_record)
+    final_vendor = audit_record.vendor if not audit_record.policy_blocked else None
+
+    safe_log.info(
+        "admin.test_console.completed",
+        correlation_id=correlation_id,
+        session_id=body.session_id,
+    )
+
     return TestConsoleResponse(
         correlation_id=correlation_id,
-        dry_run=dry_run,
         layers=layers,
         final_vendor=final_vendor,
-        total_latency_ms=round((time.monotonic() - total_start) * 1000, 1),
-        error=error,
+        total_latency_ms=total_ms,
+        timed_out=False,
+        error=audit_record.error_type,
     )

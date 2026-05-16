@@ -229,6 +229,7 @@ resource "aws_ecs_task_definition" "admin" {
       { name = "ADMIN_DYNAMODB_REVIEW_TABLE", value = aws_dynamodb_table.review_log.name },
       { name = "ADMIN_COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.admin.id },
       { name = "ADMIN_COGNITO_REGION", value = var.aws_region },
+      { name = "ADMIN_SQS_INCOMING_URL", value = aws_sqs_queue.incoming.url },
     ]
     logConfiguration = {
       logDriver = "awslogs"

@@ -7,7 +7,6 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
-import { INTENT_DOMAINS } from "../schemas/test-console";
 import type { TestConsoleResponse, TestConsoleLayerResult } from "../schemas/test-console";
 
 // ---------------------------------------------------------------------------
@@ -15,17 +14,19 @@ import type { TestConsoleResponse, TestConsoleLayerResult } from "../schemas/tes
 // ---------------------------------------------------------------------------
 
 const LAYER_COLOR: Record<string, string> = {
-  bouncer: "bg-blue-400",
+  redactor:   "bg-green-400",
+  bouncer:    "bg-blue-400",
   classifier: "bg-violet-400",
   strategist: "bg-amber-400",
-  adapter: "bg-slate-400",
+  adapter:    "bg-slate-400",
 };
 
 const LAYER_LABEL: Record<string, string> = {
-  bouncer: "Bouncer",
+  redactor:   "Redactor",
+  bouncer:    "Bouncer",
   classifier: "Classifier",
   strategist: "Strategist",
-  adapter: "Adapter",
+  adapter:    "Adapter",
 };
 
 function shortVendor(v: string | null | undefined): string {
@@ -38,6 +39,7 @@ function renderOutcomeValue(v: unknown): string {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (typeof v === "number") return String(v);
   if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.length > 0 ? v.join(", ") : "none";
   return JSON.stringify(v);
 }
 
@@ -46,13 +48,15 @@ function renderOutcomeValue(v: unknown): string {
 // ---------------------------------------------------------------------------
 
 function LatencyBar({ layers, total }: { layers: TestConsoleLayerResult[]; total: number }) {
+  const timed = layers.filter((l) => l.latency_ms > 0);
+  if (timed.length === 0) return null;
   return (
     <div>
       <p className="mb-1 text-xs text-muted-foreground">
-        Latency breakdown — total {total} ms
+        Total pipeline latency: {total} ms
       </p>
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {layers.map((l) => {
+        {timed.map((l) => {
           const pct = total > 0 ? (l.latency_ms / total) * 100 : 0;
           return (
             <div
@@ -64,22 +68,12 @@ function LatencyBar({ layers, total }: { layers: TestConsoleLayerResult[]; total
           );
         })}
       </div>
-      <div className="mt-1 flex flex-wrap gap-3">
-        {layers.map((l) => (
-          <span key={l.layer} className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span
-              className={`inline-block h-2 w-2 rounded-full ${LAYER_COLOR[l.layer] ?? "bg-gray-400"}`}
-            />
-            {LAYER_LABEL[l.layer] ?? l.layer}: {l.latency_ms} ms
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Layer card
+// Layer badge
 // ---------------------------------------------------------------------------
 
 function layerBadge(layer: string, outcome: Record<string, unknown>): ReactElement | null {
@@ -87,9 +81,13 @@ function layerBadge(layer: string, outcome: Record<string, unknown>): ReactEleme
   if (typeof errorType === "string") {
     return <Badge variant="destructive">{errorType}</Badge>;
   }
-  const skipped = outcome["skipped"];
-  if (skipped !== undefined) {
-    return <Badge variant="default">Skipped</Badge>;
+  if (layer === "redactor") {
+    const count = outcome["entity_count"];
+    return (
+      <Badge variant={count ? "warning" : "success"}>
+        {count ? `${String(count)} entities redacted` : "No PII found"}
+      </Badge>
+    );
   }
   if (layer === "bouncer") {
     const allowed = outcome["allowed"];
@@ -101,17 +99,7 @@ function layerBadge(layer: string, outcome: Record<string, unknown>): ReactEleme
   }
   if (layer === "classifier") {
     const intent = outcome["intent"];
-    if (typeof intent === "string") {
-      const overridden = outcome["overridden"];
-      return (
-        <span className="flex items-center gap-1.5">
-          <Badge variant="default">{intent}</Badge>
-          {overridden === true && (
-            <Badge variant="warning" className="text-xs">overridden</Badge>
-          )}
-        </span>
-      );
-    }
+    if (typeof intent === "string") return <Badge variant="default">{intent}</Badge>;
   }
   if (layer === "strategist") {
     const blocked = outcome["blocked"];
@@ -127,26 +115,21 @@ function layerBadge(layer: string, outcome: Record<string, unknown>): ReactEleme
 
 function LayerCard({ result }: { result: TestConsoleLayerResult }) {
   const [expanded, setExpanded] = useState(false);
-  const badge = layerBadge(result.layer, result.outcome);
   const hasError = typeof result.outcome["error_type"] === "string";
-  const isSkipped = result.outcome["skipped"] !== undefined;
+  const badge = layerBadge(result.layer, result.outcome);
 
   return (
-    <div
-      className={`rounded-lg border bg-card ${hasError ? "border-red-200" : isSkipped ? "border-dashed" : ""}`}
-    >
+    <div className={`rounded-lg border bg-card ${hasError ? "border-red-200" : ""}`}>
       <div
         className="flex cursor-pointer items-center gap-3 px-4 py-3"
         onClick={() => setExpanded((v) => !v)}
         role="button"
         aria-expanded={expanded}
       >
-        {/* Layer colour dot */}
         <span
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${LAYER_COLOR[result.layer] ?? "bg-gray-400"}`}
         />
         <span className="font-medium">{LAYER_LABEL[result.layer] ?? result.layer}</span>
-        <span className="text-xs text-muted-foreground">{result.latency_ms} ms</span>
         {badge}
         <span className="ml-auto text-xs text-muted-foreground">{expanded ? "▲" : "▼"}</span>
       </div>
@@ -173,68 +156,65 @@ function LayerCard({ result }: { result: TestConsoleLayerResult }) {
 // Trace result pane
 // ---------------------------------------------------------------------------
 
-interface TraceProps {
-  result: TestConsoleResponse;
-}
-
-function TraceResult({ result }: TraceProps) {
-  const finalLayer = result.layers[result.layers.length - 1];
-  const stopped =
-    finalLayer?.layer === "bouncer" &&
+function TraceResult({ result }: { result: TestConsoleResponse }) {
+  const blocked =
     result.layers.length === 1 &&
+    result.layers[0]?.layer === "bouncer" &&
     result.layers[0]?.outcome["allowed"] === false;
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium">Trace complete</span>
-        <Badge variant={result.error ? "destructive" : "success"}>
-          {result.error ? `Error: ${result.error}` : "OK"}
-        </Badge>
-        {result.dry_run && (
-          <Badge variant="default">Dry-run</Badge>
+        {result.timed_out ? (
+          <Badge variant="warning">Timed out — pipeline may still be running</Badge>
+        ) : (
+          <Badge variant={result.error ? "destructive" : "success"}>
+            {result.error ? `Error: ${result.error}` : "OK"}
+          </Badge>
         )}
         <span className="ml-auto font-mono text-xs text-muted-foreground">
           {result.correlation_id}
         </span>
       </div>
 
-      {/* Latency bar */}
+      <LatencyBar layers={result.layers} total={result.total_latency_ms} />
+
       {result.layers.length > 0 && (
-        <LatencyBar layers={result.layers} total={result.total_latency_ms} />
+        <div className="relative space-y-2 pl-4">
+          <div className="absolute left-0 top-3 h-[calc(100%-1.5rem)] w-px bg-border" />
+          {result.layers.map((l, i) => (
+            <LayerCard key={`${l.layer}-${i}`} result={l} />
+          ))}
+        </div>
       )}
 
-      {/* Layer timeline */}
-      <div className="relative space-y-2 pl-4">
-        {/* Vertical line */}
-        <div className="absolute left-0 top-3 h-[calc(100%-1.5rem)] w-px bg-border" />
-        {result.layers.map((l, i) => (
-          <LayerCard key={`${l.layer}-${i}`} result={l} />
-        ))}
-      </div>
-
-      {/* Final result */}
       <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-        {result.error ? (
+        {result.timed_out ? (
+          <p className="text-muted-foreground">
+            Pipeline did not complete within 30 s. The Orchestrator may still be
+            processing — check the Audit Log for correlation ID{" "}
+            <span className="font-mono">{result.correlation_id}</span>.
+          </p>
+        ) : result.error ? (
           <p className="text-destructive">
             Pipeline error: <span className="font-mono">{result.error}</span>
           </p>
-        ) : stopped ? (
-          <p className="text-muted-foreground">Request was blocked by the Bouncer — no further layers ran.</p>
-        ) : result.dry_run ? (
-          <p className="text-muted-foreground">
-            Dry-run complete. Selected vendor:{" "}
-            <span className="font-mono font-medium">{shortVendor(result.final_vendor)}</span>
-            . Vendor was not invoked (Phase 1 admin context or dry_run=true).
-          </p>
+        ) : blocked ? (
+          <p className="text-muted-foreground">Request was blocked by the Bouncer.</p>
         ) : (
           <p>
-            Final vendor:{" "}
+            Selected vendor:{" "}
             <span className="font-mono font-medium">{shortVendor(result.final_vendor)}</span>
+            {". "}Vendor was invoked and the response was de-redacted.
           </p>
         )}
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        Latency values are end-to-end (SQS submit → audit written). Per-layer
+        latencies are available in CloudWatch logs.
+      </p>
     </div>
   );
 }
@@ -244,11 +224,9 @@ function TraceResult({ result }: TraceProps) {
 // ---------------------------------------------------------------------------
 
 interface FormValues {
-  redacted_message: string;
-  dry_run: boolean;
+  message: string;
   user_sub: string;
   session_id: string;
-  intent_override: string;
   show_overrides: boolean;
 }
 
@@ -267,11 +245,9 @@ export function TestConsole() {
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      redacted_message: "",
-      dry_run: true,
+      message: "",
       user_sub: "admin-test-user",
       session_id: "admin-test-session",
-      intent_override: "",
       show_overrides: false,
     },
   });
@@ -281,14 +257,11 @@ export function TestConsole() {
   async function onSubmit(values: FormValues) {
     setResult(null);
     try {
-      const payload: Parameters<typeof trace.mutateAsync>[0] = {
-        redacted_message: values.redacted_message.trim(),
-        dry_run: values.dry_run,
+      const res = await trace.mutateAsync({
+        message: values.message.trim(),
         user_sub: values.user_sub.trim() || "admin-test-user",
         session_id: values.session_id.trim() || "admin-test-session",
-      };
-      if (values.intent_override) payload.intent_override = values.intent_override;
-      const res = await trace.mutateAsync(payload);
+      });
       setResult(res);
     } catch {
       // error available via trace.error
@@ -300,16 +273,9 @@ export function TestConsole() {
       <div>
         <h1 className="text-xl font-semibold">Test Console</h1>
         <p className="text-sm text-muted-foreground">
-          Trace a message through the pipeline layers without sending to a real user.
-          Traces are logged with redacted content only.
+          Send a message through the real pipeline. Each trace increments
+          Bouncer and Classifier metrics.
         </p>
-      </div>
-
-      {/* PII warning */}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <strong>Input must be already-redacted.</strong> Do not paste raw user
-        messages or any text containing PII. The test console is not a debugging
-        escape hatch for raw input (CLAUDE.md §7).
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -321,44 +287,29 @@ export function TestConsole() {
             onSubmit={(e) => void handleSubmit(onSubmit)(e)}
             className="space-y-4"
           >
-            {/* Message */}
             <div className="space-y-1.5">
-              <Label htmlFor="redacted_message">
-                Redacted message <span className="text-destructive">*</span>
+              <Label htmlFor="message">
+                Message <span className="text-destructive">*</span>
               </Label>
               <Textarea
-                id="redacted_message"
+                id="message"
                 rows={6}
-                placeholder="e.g. My [NRIC] was used without permission. I need help with my [ACCOUNT_NUMBER]."
-                {...register("redacted_message", {
+                placeholder="e.g. Can you help me debug this Python function? It keeps raising a TypeError."
+                {...register("message", {
                   required: "Message is required",
                   minLength: { value: 1, message: "Message cannot be empty" },
                   maxLength: { value: 4096, message: "Message too long (max 4096 chars)" },
                 })}
               />
-              {errors.redacted_message && (
-                <p className="text-xs text-destructive">{errors.redacted_message.message}</p>
+              {errors.message && (
+                <p className="text-xs text-destructive">{errors.message.message}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                PII is safe — Presidio redaction runs before any LLM call.
+                The audit log never stores message content.
+              </p>
             </div>
 
-            {/* Dry-run toggle */}
-            <div className="flex items-start gap-3">
-              <input
-                id="dry_run"
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-input"
-                {...register("dry_run")}
-              />
-              <div>
-                <Label htmlFor="dry_run">Dry-run (stop before vendor)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Always enabled in Phase 1 — admin IAM denies{" "}
-                  <code className="font-mono">bedrock:*</code>.
-                </p>
-              </div>
-            </div>
-
-            {/* Optional overrides toggle */}
             <div className="flex items-center gap-2">
               <input
                 id="show_overrides"
@@ -373,28 +324,6 @@ export function TestConsole() {
 
             {showOverrides && (
               <div className="space-y-3 rounded-md border bg-muted/30 px-3 py-3">
-                {/* Intent override — bypasses Classifier deep path (Bedrock denied) */}
-                <div className="space-y-1">
-                  <Label htmlFor="intent_override" className="text-xs">
-                    Intent override
-                  </Label>
-                  <select
-                    id="intent_override"
-                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                    {...register("intent_override")}
-                  >
-                    <option value="">— let Classifier decide —</option>
-                    {INTENT_DOMAINS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    Skip Classifier and use this intent directly. Required when
-                    the fast-path heuristics don&apos;t match (admin IAM denies{" "}
-                    <code className="font-mono">bedrock:*</code>).
-                  </p>
-                </div>
-
                 <div className="space-y-1">
                   <Label htmlFor="user_sub" className="text-xs">user_sub</Label>
                   <Input
@@ -420,7 +349,7 @@ export function TestConsole() {
               {trace.isPending ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" />
-                  Running trace…
+                  Waiting for pipeline result…
                 </span>
               ) : (
                 "Run trace"
@@ -445,7 +374,8 @@ export function TestConsole() {
             <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
               <p className="font-medium text-muted-foreground">No trace yet</p>
               <p className="text-sm text-muted-foreground">
-                Enter a redacted message and click "Run trace" to see per-layer results.
+                Enter a message and click "Run trace". Results come from the
+                audit log after the Orchestrator finishes (up to 30 s).
               </p>
             </div>
           )}
@@ -453,7 +383,8 @@ export function TestConsole() {
           {trace.isPending && (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <Spinner className="h-6 w-6" />
-              <p className="text-sm">Tracing through pipeline…</p>
+              <p className="text-sm">Message sent — waiting for Orchestrator…</p>
+              <p className="text-xs">Up to 30 s. Bouncer → Classifier → Strategist → Vendor</p>
             </div>
           )}
 

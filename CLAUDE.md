@@ -10,6 +10,14 @@ A multi-layer AI message router on AWS. Five sequential layers: **Bouncer → In
 
 The full architecture lives in `docs/architecture.md`. Read it before starting any new layer. Decision rationale (the *why* behind the non-negotiables) lives in `docs/adr/`.
 
+### Where the content lives (use this map; don't search)
+
+| If you need... | Read |
+|---|---|
+| Admin dashboard frontend (React SPA) — tech stack, auth flow, per-view specs, deployment | `docs/admin-dashboard.md` |
+
+If a topic doesn't appear above, it's either in this file (below) or hasn't been decided yet — leave a `# TODO(spec):` and surface in the PR description.
+
 ---
 
 ## 2. Locked decisions (do not re-litigate)

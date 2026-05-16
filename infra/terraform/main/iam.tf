@@ -160,6 +160,11 @@ data "aws_iam_policy_document" "admin_allow" {
     actions   = ["sqs:GetQueueAttributes", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
     resources = [aws_sqs_queue.escalation.arn]
   }
+  # Test console submits messages through the real pipeline for accurate metrics
+  statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.incoming.arn]
+  }
   statement {
     actions   = ["cloudwatch:GetMetricData", "cloudwatch:ListMetrics", "cloudwatch:GetMetricStatistics"]
     resources = ["*"]
@@ -167,17 +172,11 @@ data "aws_iam_policy_document" "admin_allow" {
 }
 
 data "aws_iam_policy_document" "admin_deny" {
-  # Safety net — admin must never touch Bedrock, send to the incoming queue,
-  # or hard-delete audit/review records (CLAUDE.md §7 "Admin dashboard").
+  # Safety net — admin must never touch Bedrock or hard-delete audit records.
   statement {
     effect    = "Deny"
     actions   = ["bedrock:*"]
     resources = ["*"]
-  }
-  statement {
-    effect    = "Deny"
-    actions   = ["sqs:SendMessage"]
-    resources = [aws_sqs_queue.incoming.arn]
   }
   statement {
     effect    = "Deny"

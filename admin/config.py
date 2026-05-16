@@ -19,6 +19,7 @@ class AdminConfig(BaseSettings):
 
     # SQS
     sqs_escalation_url: str = Field(default="")
+    sqs_incoming_url: str = Field(default="")
     sqs_escalation_visibility_seconds: int = Field(default=300)
 
     # Redis (aggregate stats only — no vault reads allowed)

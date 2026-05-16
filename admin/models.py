@@ -185,19 +185,16 @@ class AuditQuery(_Out):
 
 
 class TestConsoleRequest(_Out):
-    """Input for the test console. Only the redacted text is accepted.
+    """Input for the test console.
 
-    The test console never routes to real vendors and never stores raw input.
+    The message is submitted to the real pipeline via SQS. Presidio redaction
+    runs first so PII is safe to include. The audit log never stores content.
     """
 
-    redacted_message: str = Field(
+    message: str = Field(
         min_length=1,
         max_length=4096,
-        description="Already-redacted test message. Raw PII is the caller's responsibility.",
-    )
-    dry_run: bool = Field(
-        default=True,
-        description="If True, stop before vendor invocation. Always True in Phase 1.",
+        description="Message to send through the pipeline. PII is redacted by Presidio.",
     )
     user_sub: str = Field(
         default="admin-test-user",
@@ -205,14 +202,6 @@ class TestConsoleRequest(_Out):
         max_length=128,
     )
     session_id: str = Field(default="admin-test-session", min_length=1, max_length=128)
-    intent_override: str | None = Field(
-        default=None,
-        description=(
-            "Skip the Classifier and use this IntentDomain value directly. "
-            "Necessary because admin IAM denies bedrock:* so the Classifier deep "
-            "path (Sonnet) always fails for messages that miss the fast-path heuristics."
-        ),
-    )
 
 
 class TestConsoleLayerResult(_Out):
@@ -223,8 +212,8 @@ class TestConsoleLayerResult(_Out):
 
 class TestConsoleResponse(_Out):
     correlation_id: str
-    dry_run: bool
     layers: list[TestConsoleLayerResult]
     final_vendor: str | None
     total_latency_ms: float
+    timed_out: bool
     error: str | None

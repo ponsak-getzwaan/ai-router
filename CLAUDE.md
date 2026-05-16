@@ -33,7 +33,7 @@ These were open questions in the project summary. They are now closed.
 | Vendor adapter library | **LiteLLM, pinned to a known-good version** | Avoid 1.82.7 and 1.82.8 (security advisories). Pin in `pyproject.toml`, do not float. |
 | Deployment topology | **Phase 1 of project summary** — every layer is one ECS Fargate service. No Lambda yet. | Phase 2 migration is a future task; do not pre-optimise. |
 | Handoff between layers | **Direct async calls within the orchestrator process** (Option A in summary) | Per-layer SQS queues are Phase 3, not now. |
-| Bedrock model IDs | **Cross-region inference profiles only** (e.g. `apac.anthropic.claude-haiku-4-5-...`) | Raw model IDs fail with "on-demand throughput not supported". Always use the inference profile ARN/ID. |
+| Bedrock model IDs | **Cross-region inference profiles only** (e.g. `apac.anthropic.claude-3-haiku-20240307-v1:0`) | Raw model IDs fail with "on-demand throughput not supported". Always use the inference profile ARN/ID. |
 | Logging | **`structlog` with an allowlist-based context processor** | See §5. |
 | Test framework | **pytest + pytest-asyncio** | LocalStack for SQS/DynamoDB, fakeredis for Redis, moto only where LocalStack is awkward. |
 
@@ -53,7 +53,7 @@ These come straight from `docs/architecture.md` §"Key Principles". Repeated her
 6. **No PII in logs ever.** Use `safe_log()` from `shared/logging.py`. Allowlist-based: only fields in the allowlist are emitted. Never log `error.message`, only `type(error).__name__`. See §5.
 7. **Bedrock invocation logging disabled.** Terraform sets `loggingConfig: null` on every Bedrock invocation. Do not enable it "for debugging".
 8. **Escalate, don't guess.** If confidence is below the threshold for that layer, route to the human review SQS queue. Do not pick a default vendor when uncertain.
-9. **Data residency at the IAM level.** Bedrock IAM policies include a `Condition` block that locks `aws:RequestedRegion` to `ap-southeast-1`. The policy engine is defence in depth; IAM is the actual boundary.
+9. **Data residency at the application layer.** Bedrock IAM uses `Resource: *` with no region condition — both `aws:RequestedRegion` and `apac.*` resource ARN restrictions cause `AccessDeniedException` because APAC cross-region inference profiles route internally through other AWS regions and check IAM against the underlying `anthropic.*` foundation model ARNs. Data residency is enforced by **only using `apac.*` inference profile IDs** in all layer configs; do not add a raw `anthropic.*` model ID anywhere in code or config.
 10. **Raw message never leaves the Orchestrator.** Only `redacted_message` flows in `PipelineEnvelope` to downstream layers. The raw message is hashed (`raw_message_hash`) for audit but never propagated.
 
 ---
@@ -159,9 +159,9 @@ These checks run on every PR. Don't bypass them.
 
 - Region: `ap-southeast-1` (Singapore). Hard-coded in IAM policy conditions and in the Bedrock client factory in `shared/bedrock.py`.
 - Model IDs (use cross-region inference profiles):
-  - Haiku: `apac.anthropic.claude-haiku-4-5-...` — for the Bouncer micro-classifier and Strategist arbitration.
-  - Sonnet: `apac.anthropic.claude-sonnet-4-6-...` — for deep-path intent classification.
-  - Verify the exact profile ID in the Bedrock console before pinning. Once pinned, do not change without a PR.
+  - Haiku: `apac.anthropic.claude-3-haiku-20240307-v1:0` — for the Bouncer micro-classifier and Strategist arbitration.
+  - Sonnet: `apac.anthropic.claude-3-5-sonnet-20241022-v2:0` — for deep-path intent classification.
+  - Verified active in ap-southeast-1 on 2026-05-16. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a PR.
 - First-time use: each AWS account hitting Anthropic models needs the FTU form submitted once. Console clicks, not Terraform.
 - `bedrock-runtime` invocation logging is **disabled**. Application-level logging via `safe_log` is the audit trail.
 

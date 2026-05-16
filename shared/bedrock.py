@@ -65,6 +65,9 @@ class BedrockRuntime:
             botocore.exceptions.ClientError,
             botocore.exceptions.BotoCoreError,
         ) as exc:
+            from shared.logging import safe_log as _log
+            _code = getattr(exc, "response", {}).get("Error", {}).get("Code", type(exc).__name__)
+            _log.warning("bedrock.client_error", error_type=type(exc).__name__, error_code=_code, model_id=model_id)
             raise BedrockError(type(exc).__name__) from exc
         except Exception as exc:
             raise BedrockError(type(exc).__name__) from exc

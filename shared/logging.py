@@ -90,12 +90,14 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "retry_count",
         "tokens_in",
         "tokens_out",
-        # Errors (type names only)
+        # Errors (type names only, never messages)
         "error_type",
+        "error_code",
         "exit_code",
         "http_status",
         # Region / infrastructure
         "bedrock_region",
+        "model_id",
         "service_name",
         "service_version",
         # Entity types (the type names, NEVER the values)

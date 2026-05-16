@@ -17,7 +17,7 @@ from shared.models import PipelineEnvelope
 class NoOpMetrics:
     """MetricPublisher that discards all metrics. Used in unit tests."""
 
-    async def put_count(self, metric_name: str) -> None:
+    async def put_count(self, metric_name: str, dimensions: dict[str, str] | None = None) -> None:
         pass
 
 

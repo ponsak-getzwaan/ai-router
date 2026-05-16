@@ -65,4 +65,4 @@ class BouncerConfig(BaseSettings):
     # -------------------------------------------------------------------------
     redis_url: str = Field(default="redis://localhost:6379")
     bedrock_region: str = Field(default="ap-southeast-1")
-    cloudwatch_namespace: str = Field(default="AIRouter/Bouncer")
+    cloudwatch_namespace: str = Field(default="AIRouter")

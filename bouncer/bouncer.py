@@ -33,11 +33,11 @@ class Bouncer:
         bedrock: BedrockRuntime,
         metrics: MetricPublisher | None = None,
     ) -> None:
-        _metrics: MetricPublisher = metrics or CloudWatchMetrics(
+        self._metrics: MetricPublisher = metrics or CloudWatchMetrics(
             config.cloudwatch_namespace, config.bedrock_region
         )
         self._rule_gate = RuleGate(config, redis)
-        self._llm_classifier = LLMClassifier(config, bedrock, _metrics)
+        self._llm_classifier = LLMClassifier(config, bedrock, self._metrics)
         self._config = config
 
     async def bounce(self, envelope: PipelineEnvelope) -> BounceResult:
@@ -59,6 +59,10 @@ class Bouncer:
                 reason=rule_result.reason,
                 rule_gate_latency_ms=elapsed_ms,
             )
+            await self._metrics.put_count(
+                "RequestCount", {"Layer": "bouncer", "Outcome": "rejected"}
+            )
+            await self._metrics.put_count("RequestCount", {"Layer": "bouncer"})
             return rule_result
 
         # Phase 2: Haiku LLM classifier with whatever budget remains.
@@ -74,6 +78,8 @@ class Bouncer:
                 timed_out=True,
                 rule_gate_latency_ms=elapsed_ms,
             )
+            await self._metrics.put_count("BouncerTimeout", {"Layer": "bouncer"})
+            await self._metrics.put_count("RequestCount", {"Layer": "bouncer"})
             return BounceResult(
                 allowed=True,
                 reason="budget_overrun_fail_open",
@@ -93,6 +99,14 @@ class Bouncer:
             timed_out=result.timed_out,
             total_latency_ms=total_ms,
         )
+
+        outcome = "escalated" if result.escalate else "passed"
+        await self._metrics.put_count(
+            "RequestCount", {"Layer": "bouncer", "Outcome": outcome}
+        )
+        # Aggregate total (no Outcome dimension) — what the dashboard shows as "Total requests"
+        await self._metrics.put_count("RequestCount", {"Layer": "bouncer"})
+
         return result
 
 

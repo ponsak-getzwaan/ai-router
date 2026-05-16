@@ -33,7 +33,9 @@ _SYSTEM_PROMPT = (
 class MetricPublisher(Protocol):
     """Publishes a single count metric. Injected for testability."""
 
-    async def put_count(self, metric_name: str) -> None: ...
+    async def put_count(
+        self, metric_name: str, dimensions: dict[str, str] | None = None
+    ) -> None: ...
 
 
 class CloudWatchMetrics:
@@ -44,12 +46,20 @@ class CloudWatchMetrics:
         self._region = region
         self._session: aioboto3.Session = aioboto3.Session()
 
-    async def put_count(self, metric_name: str) -> None:
+    async def put_count(
+        self, metric_name: str, dimensions: dict[str, str] | None = None
+    ) -> None:
+        dims = [{"Name": k, "Value": v} for k, v in (dimensions or {}).items()]
         try:
             async with self._session.client("cloudwatch", region_name=self._region) as cw:
                 await cw.put_metric_data(
                     Namespace=self._namespace,
-                    MetricData=[{"MetricName": metric_name, "Value": 1, "Unit": "Count"}],
+                    MetricData=[{
+                        "MetricName": metric_name,
+                        "Value": 1,
+                        "Unit": "Count",
+                        "Dimensions": dims,
+                    }],
                 )
         except Exception as exc:
             safe_log.warning("bouncer.cloudwatch.error", error_type=type(exc).__name__)
@@ -82,7 +92,7 @@ class LLMClassifier:
                 timed_out=True,
                 allowed=True,
             )
-            await self._metrics.put_count("BouncerTimeout")
+            await self._metrics.put_count("BouncerTimeout", {"Layer": "bouncer"})
             return BounceResult(
                 allowed=True,
                 reason="haiku_timeout_fail_open",
@@ -96,7 +106,7 @@ class LLMClassifier:
                 error_type=type(exc).__name__,
                 allowed=True,
             )
-            await self._metrics.put_count("BouncerError")
+            await self._metrics.put_count("BouncerError", {"Layer": "bouncer"})
             return BounceResult(
                 allowed=True,
                 reason="haiku_error_fail_open",

@@ -14,8 +14,8 @@ from shared.models import ClassifiedIntent, PipelineEnvelope, RoutingPlan
 # All are Bedrock inference profiles — non-Bedrock vendors are always blocked.
 _APPROVED_VENDORS: frozenset[str] = frozenset(
     {
-        "apac.anthropic.claude-haiku-4-5-20241022-v1:0",
-        "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        "apac.anthropic.claude-3-haiku-20240307-v1:0",
+        "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
     }
 )
 
@@ -51,7 +51,7 @@ def apply_policies(
             blocked=True,
             applied_policies=["sg_residency"],
         )
-        primary_vendor = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+        primary_vendor = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
         applied.append("sg_residency")
         blocked = False  # rerouted, not hard-blocked
 

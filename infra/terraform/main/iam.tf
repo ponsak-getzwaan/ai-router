@@ -53,10 +53,14 @@ data "aws_iam_policy_document" "orchestrator" {
     resources = [aws_sqs_queue.escalation.arn]
   }
 
-  # DynamoDB — audit log + review log writes
+  # DynamoDB — audit log + review log writes; routing rules read (Strategist runs in-process)
   statement {
     actions   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"]
     resources = [aws_dynamodb_table.audit_log.arn, aws_dynamodb_table.review_log.arn]
+  }
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:Query"]
+    resources = [aws_dynamodb_table.routing_rules.arn]
   }
 
   # ElastiCache is network-level access (no IAM policy needed for Redis)

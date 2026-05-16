@@ -206,10 +206,21 @@ function TraceResult({ result }: { result: TestConsoleResponse }) {
           <p>
             Selected vendor:{" "}
             <span className="font-mono font-medium">{shortVendor(result.final_vendor)}</span>
-            {". "}Vendor was invoked and the response was de-redacted.
           </p>
         )}
       </div>
+
+      {result.response && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">
+            Response{" "}
+            <span className="font-normal italic">(redacted — PII replaced with tokens)</span>
+          </p>
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 px-4 py-3 font-mono text-xs leading-relaxed">
+            {result.response}
+          </pre>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Latency values are end-to-end (SQS submit → audit written). Per-layer

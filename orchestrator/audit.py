@@ -58,6 +58,8 @@ class AuditLogger:
             "vendor": plan.primary_vendor if plan else None,
             "routing_path": plan.path if plan else None,
             "policy_blocked": plan.blocked if plan else None,
+            # Vendor response — redacted text (before vault restore), truncated at 4000 chars
+            "vendor_response_redacted": vendor_response[:4000] if vendor_response else None,
             # Latency
             "total_latency_ms": str(round(total_ms, 1)),
             # Error (type name only — never message)

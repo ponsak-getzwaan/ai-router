@@ -186,4 +186,5 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         total_latency_ms=total_ms,
         timed_out=False,
         error=audit_record.error_type,
+        response=audit_record.vendor_response_redacted,
     )

@@ -19,6 +19,7 @@ export const TestConsoleResponseSchema = z.object({
   total_latency_ms: z.number(),
   timed_out: z.boolean(),
   error: z.string().nullable(),
+  response: z.string().nullable().optional(),
 });
 
 export type TestConsoleRequest = z.infer<typeof TestConsoleRequestSchema>;

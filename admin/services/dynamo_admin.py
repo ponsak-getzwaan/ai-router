@@ -138,4 +138,5 @@ class DynamoAdminService:
             policy_blocked=item.get("policy_blocked"),
             total_latency_ms=item.get("total_latency_ms"),
             error_type=item.get("error_type"),
+            vendor_response_redacted=item.get("vendor_response_redacted"),
         )

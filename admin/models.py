@@ -171,6 +171,7 @@ class AuditRecord(_Out):
     policy_blocked: bool | None
     total_latency_ms: str | None
     error_type: str | None
+    vendor_response_redacted: str | None = None
 
 
 class AuditQuery(_Out):
@@ -217,3 +218,4 @@ class TestConsoleResponse(_Out):
     total_latency_ms: float
     timed_out: bool
     error: str | None
+    response: str | None = None

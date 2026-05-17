@@ -1,13 +1,25 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useForm } from "react-hook-form";
-import { useRunTrace } from "../api/test-console";
+import { apiFetch } from "../api/client";
 import { Spinner } from "../components/Spinner";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
-import type { TestConsoleResponse, TestConsoleLayerResult } from "../schemas/test-console";
+import { TestConsoleResponseSchema, type TestConsoleResponse, type TestConsoleLayerResult } from "../schemas/test-console";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ChatEntry {
+  id: string;
+  userMessage: string;
+  pending: boolean;
+  result: TestConsoleResponse | null;
+  error: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,58 +56,19 @@ function renderOutcomeValue(v: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// Latency breakdown bar
-// ---------------------------------------------------------------------------
-
-function LatencyBar({ layers, total }: { layers: TestConsoleLayerResult[]; total: number }) {
-  const timed = layers.filter((l) => l.latency_ms > 0);
-  if (timed.length === 0) return null;
-  return (
-    <div>
-      <p className="mb-1 text-xs text-muted-foreground">
-        Total pipeline latency: {total} ms
-      </p>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {timed.map((l) => {
-          const pct = total > 0 ? (l.latency_ms / total) * 100 : 0;
-          return (
-            <div
-              key={l.layer}
-              title={`${LAYER_LABEL[l.layer] ?? l.layer}: ${l.latency_ms} ms`}
-              className={`${LAYER_COLOR[l.layer] ?? "bg-gray-400"}`}
-              style={{ width: `${pct}%` }}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Layer badge
+// Layer card (used inside collapsible trace)
 // ---------------------------------------------------------------------------
 
 function layerBadge(layer: string, outcome: Record<string, unknown>): ReactElement | null {
   const errorType = outcome["error_type"];
-  if (typeof errorType === "string") {
-    return <Badge variant="destructive">{errorType}</Badge>;
-  }
+  if (typeof errorType === "string") return <Badge variant="destructive">{errorType}</Badge>;
   if (layer === "redactor") {
     const count = outcome["entity_count"];
-    return (
-      <Badge variant={count ? "warning" : "success"}>
-        {count ? `${String(count)} entities redacted` : "No PII found"}
-      </Badge>
-    );
+    return <Badge variant={count ? "warning" : "success"}>{count ? `${String(count)} entities redacted` : "No PII found"}</Badge>;
   }
   if (layer === "bouncer") {
     const allowed = outcome["allowed"];
-    return (
-      <Badge variant={allowed ? "success" : "destructive"}>
-        {allowed ? "Allowed" : "Blocked"}
-      </Badge>
-    );
+    return <Badge variant={allowed ? "success" : "destructive"}>{allowed ? "Allowed" : "Blocked"}</Badge>;
   }
   if (layer === "classifier") {
     const intent = outcome["intent"];
@@ -104,11 +77,7 @@ function layerBadge(layer: string, outcome: Record<string, unknown>): ReactEleme
   if (layer === "strategist") {
     const blocked = outcome["blocked"];
     const vendor = outcome["primary_vendor"];
-    return (
-      <Badge variant={blocked ? "destructive" : "success"}>
-        {blocked ? "Blocked" : shortVendor(typeof vendor === "string" ? vendor : null)}
-      </Badge>
-    );
+    return <Badge variant={blocked ? "destructive" : "success"}>{blocked ? "Blocked" : shortVendor(typeof vendor === "string" ? vendor : null)}</Badge>;
   }
   return null;
 }
@@ -117,31 +86,22 @@ function LayerCard({ result }: { result: TestConsoleLayerResult }) {
   const [expanded, setExpanded] = useState(false);
   const hasError = typeof result.outcome["error_type"] === "string";
   const badge = layerBadge(result.layer, result.outcome);
-
   return (
-    <div className={`rounded-lg border bg-card ${hasError ? "border-red-200" : ""}`}>
-      <div
-        className="flex cursor-pointer items-center gap-3 px-4 py-3"
-        onClick={() => setExpanded((v) => !v)}
-        role="button"
-        aria-expanded={expanded}
-      >
-        <span
-          className={`h-2.5 w-2.5 shrink-0 rounded-full ${LAYER_COLOR[result.layer] ?? "bg-gray-400"}`}
-        />
+    <div className={`rounded-md border bg-background text-xs ${hasError ? "border-red-200" : ""}`}>
+      <div className="flex cursor-pointer items-center gap-2 px-3 py-2" onClick={() => setExpanded((v) => !v)} role="button" aria-expanded={expanded}>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${LAYER_COLOR[result.layer] ?? "bg-gray-400"}`} />
         <span className="font-medium">{LAYER_LABEL[result.layer] ?? result.layer}</span>
         {badge}
-        <span className="ml-auto text-xs text-muted-foreground">{expanded ? "▲" : "▼"}</span>
+        <span className="ml-auto text-muted-foreground">{expanded ? "▲" : "▼"}</span>
       </div>
-
       {expanded && (
-        <div className="border-t px-4 py-3">
-          <table className="w-full text-xs">
+        <div className="border-t px-3 py-2">
+          <table className="w-full">
             <tbody>
               {Object.entries(result.outcome).map(([k, v]) => (
                 <tr key={k} className="border-b last:border-0">
-                  <td className="py-1.5 pr-4 font-mono text-muted-foreground">{k}</td>
-                  <td className="py-1.5 font-mono">{renderOutcomeValue(v)}</td>
+                  <td className="py-1 pr-3 font-mono text-muted-foreground">{k}</td>
+                  <td className="py-1 font-mono">{renderOutcomeValue(v)}</td>
                 </tr>
               ))}
             </tbody>
@@ -153,79 +113,92 @@ function LayerCard({ result }: { result: TestConsoleLayerResult }) {
 }
 
 // ---------------------------------------------------------------------------
-// Trace result pane
+// Single chat bubble pair
 // ---------------------------------------------------------------------------
 
-function TraceResult({ result }: { result: TestConsoleResponse }) {
-  const blocked =
-    result.layers.length === 1 &&
-    result.layers[0]?.layer === "bouncer" &&
-    result.layers[0]?.outcome["allowed"] === false;
+function ChatBubble({ entry }: { entry: ChatEntry }) {
+  const [showTrace, setShowTrace] = useState(false);
+  const r = entry.result;
+
+  const isBlocked = r != null && r.layers.length === 1 && r.layers[0]?.layer === "bouncer" && r.layers[0]?.outcome["allowed"] === false;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">Trace complete</span>
-        {result.timed_out ? (
-          <Badge variant="warning">Timed out — pipeline may still be running</Badge>
-        ) : (
-          <Badge variant={result.error ? "destructive" : "success"}>
-            {result.error ? `Error: ${result.error}` : "OK"}
-          </Badge>
-        )}
-        <span className="ml-auto font-mono text-xs text-muted-foreground">
-          {result.correlation_id}
-        </span>
+    <div className="space-y-2">
+      {/* User message — right aligned */}
+      <div className="flex justify-end">
+        <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+          {entry.userMessage}
+        </div>
       </div>
 
-      <LatencyBar layers={result.layers} total={result.total_latency_ms} />
-
-      {result.layers.length > 0 && (
-        <div className="relative space-y-2 pl-4">
-          <div className="absolute left-0 top-3 h-[calc(100%-1.5rem)] w-px bg-border" />
-          {result.layers.map((l, i) => (
-            <LayerCard key={`${l.layer}-${i}`} result={l} />
-          ))}
+      {/* Assistant / pipeline — left aligned */}
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+          AI
         </div>
-      )}
 
-      <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-        {result.timed_out ? (
-          <p className="text-muted-foreground">
-            Pipeline did not complete within 30 s. The Orchestrator may still be
-            processing — check the Audit Log for correlation ID{" "}
-            <span className="font-mono">{result.correlation_id}</span>.
-          </p>
-        ) : result.error ? (
-          <p className="text-destructive">
-            Pipeline error: <span className="font-mono">{result.error}</span>
-          </p>
-        ) : blocked ? (
-          <p className="text-muted-foreground">Request was blocked by the Bouncer.</p>
-        ) : (
-          <p>
-            Selected vendor:{" "}
-            <span className="font-mono font-medium">{shortVendor(result.final_vendor)}</span>
-          </p>
-        )}
+        <div className="max-w-[80%] space-y-1.5">
+          {entry.pending ? (
+            <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border bg-card px-4 py-3 text-sm text-muted-foreground">
+              <Spinner className="h-3.5 w-3.5" />
+              <span>Processing… (up to 30 s)</span>
+            </div>
+          ) : entry.error ? (
+            <div className="rounded-2xl rounded-tl-sm border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              Request error: {entry.error}
+            </div>
+          ) : r ? (
+            <>
+              {/* Response text */}
+              <div className="rounded-2xl rounded-tl-sm border bg-card px-4 py-3 text-sm leading-relaxed">
+                {r.timed_out ? (
+                  <span className="text-muted-foreground italic">
+                    Pipeline timed out after 30 s — check Audit Log for{" "}
+                    <span className="font-mono text-xs">{r.correlation_id}</span>.
+                  </span>
+                ) : r.error ? (
+                  <span className="text-destructive">Pipeline error: {r.error}</span>
+                ) : isBlocked ? (
+                  <span className="text-muted-foreground italic">Request was blocked by the Bouncer.</span>
+                ) : r.response ? (
+                  <pre className="whitespace-pre-wrap font-sans">{r.response}</pre>
+                ) : (
+                  <span className="text-muted-foreground italic">
+                    Vendor invoked — response not available (redacted).
+                  </span>
+                )}
+              </div>
+
+              {/* Metadata row */}
+              <div className="flex flex-wrap items-center gap-2 px-1">
+                {!r.timed_out && !r.error && (
+                  <span className="text-xs text-muted-foreground">
+                    {shortVendor(r.final_vendor)} · {Math.round(r.total_latency_ms / 1000 * 10) / 10} s
+                  </span>
+                )}
+                <span className="font-mono text-xs text-muted-foreground/50">{r.correlation_id.slice(0, 8)}</span>
+                {r.layers.length > 0 && (
+                  <button
+                    onClick={() => setShowTrace((v) => !v)}
+                    className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    {showTrace ? "Hide trace" : "Show trace"}
+                  </button>
+                )}
+              </div>
+
+              {/* Collapsible layer trace */}
+              {showTrace && r.layers.length > 0 && (
+                <div className="space-y-1 pl-1">
+                  {r.layers.map((l, i) => (
+                    <LayerCard key={`${l.layer}-${i}`} result={l} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
       </div>
-
-      {result.response && (
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            Response{" "}
-            <span className="font-normal italic">(redacted — PII replaced with tokens)</span>
-          </p>
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 px-4 py-3 font-mono text-xs leading-relaxed">
-            {result.response}
-          </pre>
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground">
-        Latency values are end-to-end (SQS submit → audit written). Per-layer
-        latencies are available in CloudWatch logs.
-      </p>
     </div>
   );
 }
@@ -246,14 +219,15 @@ interface FormValues {
 // ---------------------------------------------------------------------------
 
 export function TestConsole() {
-  const trace = useRunTrace();
-  const [result, setResult] = useState<TestConsoleResponse | null>(null);
+  const [history, setHistory] = useState<ChatEntry[]>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
     handleSubmit,
+    reset,
     watch,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
       message: "",
@@ -265,142 +239,132 @@ export function TestConsole() {
 
   const showOverrides = watch("show_overrides");
 
+  // Scroll to bottom whenever history changes
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history]);
+
   async function onSubmit(values: FormValues) {
-    setResult(null);
+    const entryId = crypto.randomUUID();
+    const userMessage = values.message.trim();
+
+    // Add pending entry and clear the input immediately
+    setHistory((h) => [...h, { id: entryId, userMessage, pending: true, result: null, error: null }]);
+    reset({ ...values, message: "" });
+
     try {
-      const res = await trace.mutateAsync({
-        message: values.message.trim(),
-        user_sub: values.user_sub.trim() || "admin-test-user",
-        session_id: values.session_id.trim() || "admin-test-session",
+      const raw = await apiFetch<unknown>("/admin/test-console", {
+        method: "POST",
+        body: JSON.stringify({
+          message: userMessage,
+          user_sub: values.user_sub.trim() || "admin-test-user",
+          session_id: values.session_id.trim() || "admin-test-session",
+        }),
       });
-      setResult(res);
-    } catch {
-      // error available via trace.error
+      const result = TestConsoleResponseSchema.parse(raw);
+      setHistory((h) => h.map((e) => e.id === entryId ? { ...e, pending: false, result } : e));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setHistory((h) => h.map((e) => e.id === entryId ? { ...e, pending: false, error: msg } : e));
     }
   }
 
+  const anyPending = history.some((e) => e.pending);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Test Console</h1>
-        <p className="text-sm text-muted-foreground">
-          Send a message through the real pipeline. Each trace increments
-          Bouncer and Classifier metrics.
-        </p>
+    <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Header */}
+      <div className="mb-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Test Console</h1>
+            <p className="text-sm text-muted-foreground">
+              Send messages through the real pipeline. Each trace increments Bouncer and Classifier metrics.
+            </p>
+          </div>
+          {history.length > 0 && (
+            <button
+              onClick={() => setHistory([])}
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Clear history
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* ---- Left pane: input form ---- */}
-        <div className="space-y-5 rounded-lg border bg-card p-5">
-          <h2 className="font-medium">Input</h2>
+      {/* Chat history — scrollable */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-muted/20 px-4 py-4">
+        {history.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <p className="font-medium">No messages yet</p>
+            <p className="text-sm">Type a message below and press Send.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {history.map((entry) => (
+              <ChatBubble key={entry.id} entry={entry} />
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
 
-          <form
-            onSubmit={(e) => void handleSubmit(onSubmit)(e)}
-            className="space-y-4"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="message">
-                Message <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                id="message"
-                rows={6}
-                placeholder="e.g. Can you help me debug this Python function? It keeps raising a TypeError."
-                {...register("message", {
-                  required: "Message is required",
-                  minLength: { value: 1, message: "Message cannot be empty" },
-                  maxLength: { value: 4096, message: "Message too long (max 4096 chars)" },
-                })}
-              />
-              {errors.message && (
-                <p className="text-xs text-destructive">{errors.message.message}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                PII is safe — Presidio redaction runs before any LLM call.
-                The audit log never stores message content.
-              </p>
-            </div>
+      {/* Input — fixed at bottom */}
+      <div className="mt-3 shrink-0 rounded-lg border bg-card p-4">
+        <form onSubmit={(e) => void handleSubmit(onSubmit)(e)} className="space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              id="show_overrides"
+              type="checkbox"
+              className="h-4 w-4 rounded border-input"
+              {...register("show_overrides")}
+            />
+            <Label htmlFor="show_overrides" className="cursor-pointer text-xs text-muted-foreground">
+              Override user_sub / session_id
+            </Label>
+          </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="show_overrides"
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                {...register("show_overrides")}
-              />
-              <Label htmlFor="show_overrides" className="cursor-pointer text-xs text-muted-foreground">
-                Override user_sub / session_id
-              </Label>
-            </div>
-
-            {showOverrides && (
-              <div className="space-y-3 rounded-md border bg-muted/30 px-3 py-3">
-                <div className="space-y-1">
-                  <Label htmlFor="user_sub" className="text-xs">user_sub</Label>
-                  <Input
-                    id="user_sub"
-                    className="font-mono text-xs"
-                    placeholder="admin-test-user"
-                    {...register("user_sub", { maxLength: 128 })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="session_id" className="text-xs">session_id</Label>
-                  <Input
-                    id="session_id"
-                    className="font-mono text-xs"
-                    placeholder="admin-test-session"
-                    {...register("session_id", { maxLength: 128 })}
-                  />
-                </div>
+          {showOverrides && (
+            <div className="flex gap-3">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="user_sub" className="text-xs">user_sub</Label>
+                <Input id="user_sub" className="font-mono text-xs" placeholder="admin-test-user" {...register("user_sub", { maxLength: 128 })} />
               </div>
-            )}
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="session_id" className="text-xs">session_id</Label>
+                <Input id="session_id" className="font-mono text-xs" placeholder="admin-test-session" {...register("session_id", { maxLength: 128 })} />
+              </div>
+            </div>
+          )}
 
-            <Button type="submit" disabled={trace.isPending} className="w-full">
-              {trace.isPending ? (
-                <span className="flex items-center gap-2">
-                  <Spinner className="h-4 w-4" />
-                  Waiting for pipeline result…
-                </span>
-              ) : (
-                "Run trace"
-              )}
+          <div className="flex gap-2">
+            <Textarea
+              id="message"
+              rows={2}
+              placeholder="Type a message… (PII is redacted by Presidio before any LLM call)"
+              className="resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSubmit(onSubmit)();
+                }
+              }}
+              {...register("message", {
+                required: "Message is required",
+                minLength: { value: 1, message: "Message cannot be empty" },
+                maxLength: { value: 4096, message: "Message too long (max 4096 chars)" },
+              })}
+            />
+            <Button type="submit" disabled={isSubmitting || anyPending} className="self-end px-5">
+              {anyPending ? <Spinner className="h-4 w-4" /> : "Send"}
             </Button>
+          </div>
 
-            {trace.isError && (
-              <p className="text-xs text-destructive">
-                {trace.error instanceof Error
-                  ? trace.error.message
-                  : "Trace failed. Check the backend logs."}
-              </p>
-            )}
-          </form>
-        </div>
-
-        {/* ---- Right pane: trace result ---- */}
-        <div className="rounded-lg border bg-card p-5">
-          <h2 className="mb-4 font-medium">Trace</h2>
-
-          {!result && !trace.isPending && (
-            <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
-              <p className="font-medium text-muted-foreground">No trace yet</p>
-              <p className="text-sm text-muted-foreground">
-                Enter a message and click "Run trace". Results come from the
-                audit log after the Orchestrator finishes (up to 30 s).
-              </p>
-            </div>
+          {errors.message && (
+            <p className="text-xs text-destructive">{errors.message.message}</p>
           )}
-
-          {trace.isPending && (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-              <Spinner className="h-6 w-6" />
-              <p className="text-sm">Message sent — waiting for Orchestrator…</p>
-              <p className="text-xs">Up to 30 s. Bouncer → Classifier → Strategist → Vendor</p>
-            </div>
-          )}
-
-          {result && !trace.isPending && <TraceResult result={result} />}
-        </div>
+        </form>
       </div>
     </div>
   );

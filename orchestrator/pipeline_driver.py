@@ -21,6 +21,7 @@ Non-negotiables enforced here:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import time
 from datetime import UTC, datetime
@@ -36,6 +37,7 @@ from orchestrator.presidio_client import PresidioClient
 from orchestrator.vault import TokenVault
 from shared.errors import PresidioError
 from shared.logging import safe_log
+from shared.metrics import emit_classifier, emit_strategist
 from shared.models import (
     BounceResult,
     ClassifiedIntent,
@@ -128,6 +130,7 @@ class PipelineDriver:
 
             # Step 6: Classifier
             intent = await self._classifier.classify(envelope)
+            asyncio.create_task(emit_classifier(intent, envelope.bedrock_region))
             if intent.escalate:
                 safe_log.info(
                     "pipeline.escalated",
@@ -139,6 +142,7 @@ class PipelineDriver:
 
             # Step 7: Strategist
             plan = await self._strategist.route(envelope, intent)
+            asyncio.create_task(emit_strategist(plan, envelope.bedrock_region))
             if plan.blocked:
                 safe_log.info("pipeline.policy_blocked", blocked=True)
                 return "This request cannot be processed due to compliance restrictions."

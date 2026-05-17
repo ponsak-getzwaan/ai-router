@@ -203,7 +203,7 @@ class CloudWatchService:
             "StrategistPath", [{"Name": "Path", "Value": "deterministic"}]
         )
         arbitration = await _sum(
-            "StrategistPath", [{"Name": "Path", "Value": "arbitration"}]
+            "StrategistPath", [{"Name": "Path", "Value": "haiku_arbitration"}]
         )
 
         # Vendor breakdown — short names emitted by the strategist layer.

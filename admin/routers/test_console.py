@@ -78,9 +78,11 @@ def _layers_from_audit(record: Any) -> list[TestConsoleLayerResult]:
             outcome={
                 "intent": record.intent,
                 "confidence": record.intent_confidence,
-                "escalate": False,
+                "escalate": bool(record.intent_escalated),
             },
         ))
+        if record.intent_escalated:
+            return layers
 
     # Strategist
     if record.vendor is not None or record.routing_path is not None:

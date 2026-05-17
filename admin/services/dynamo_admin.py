@@ -133,6 +133,7 @@ class DynamoAdminService:
             bouncer_escalated=item.get("bouncer_escalated"),
             intent=item.get("intent"),
             intent_confidence=item.get("intent_confidence"),
+            intent_escalated=item.get("intent_escalated"),
             vendor=item.get("vendor"),
             routing_path=item.get("routing_path"),
             policy_blocked=item.get("policy_blocked"),

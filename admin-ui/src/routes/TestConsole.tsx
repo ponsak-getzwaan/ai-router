@@ -120,7 +120,10 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
   const [showTrace, setShowTrace] = useState(false);
   const r = entry.result;
 
-  const isBlocked = r != null && r.layers.length === 1 && r.layers[0]?.layer === "bouncer" && r.layers[0]?.outcome["allowed"] === false;
+  const lastLayer = r != null ? r.layers[r.layers.length - 1] : null;
+  const isBlocked = lastLayer?.layer === "bouncer" && lastLayer?.outcome["allowed"] === false;
+  const isEscalated = lastLayer?.layer === "classifier" && lastLayer?.outcome["escalate"] === true;
+  const isPolicyBlocked = lastLayer?.layer === "strategist" && lastLayer?.outcome["blocked"] === true;
 
   return (
     <div className="space-y-2">
@@ -160,6 +163,10 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
                   <span className="text-destructive">Pipeline error: {r.error}</span>
                 ) : isBlocked ? (
                   <span className="text-muted-foreground italic">Request was blocked by the Bouncer.</span>
+                ) : isEscalated ? (
+                  <span className="text-muted-foreground italic">Request escalated for human review.</span>
+                ) : isPolicyBlocked ? (
+                  <span className="text-muted-foreground italic">Request blocked by compliance policy.</span>
                 ) : r.response ? (
                   <pre className="whitespace-pre-wrap font-sans">{r.response}</pre>
                 ) : (

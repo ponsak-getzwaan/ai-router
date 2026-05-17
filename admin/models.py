@@ -166,6 +166,7 @@ class AuditRecord(_Out):
     bouncer_escalated: bool | None
     intent: str | None
     intent_confidence: str | None
+    intent_escalated: bool | None = None
     vendor: str | None
     routing_path: str | None
     policy_blocked: bool | None

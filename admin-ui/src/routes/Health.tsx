@@ -69,7 +69,7 @@ export function Health() {
         <div>
           <h1 className="text-xl font-semibold">Pipeline Health</h1>
           <p className="text-sm text-muted-foreground">
-            AI Router — ap-southeast-1
+            Evidor.ai — ap-southeast-1
           </p>
         </div>
         <TimeWindowSelector />

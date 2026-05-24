@@ -25,12 +25,12 @@ export function Layout({ children }: Props) {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <aside className="flex w-56 shrink-0 flex-col border-r bg-card">
-        <div className="border-b px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            AI Router
+      <aside className="flex w-56 shrink-0 flex-col bg-primary">
+        <div className="border-b border-primary-foreground/20 px-4 py-5">
+          <p className="text-lg font-semibold text-primary-foreground">
+            Evidor<span className="font-normal opacity-60">.ai</span>
           </p>
-          <p className="text-sm font-medium">Admin</p>
+          <p className="text-xs text-primary-foreground/60">Admin</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2" aria-label="Main navigation">
           <ul className="space-y-0.5">
@@ -40,10 +40,10 @@ export function Layout({ children }: Props) {
                   to={to}
                   className={({ isActive }) =>
                     cn(
-                      "block rounded-md px-3 py-2 text-sm transition-colors",
+                      "block rounded-full px-3 py-2 text-sm transition-colors",
                       isActive
-                        ? "bg-accent text-accent-foreground font-medium"
-                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                        ? "bg-primary-foreground/15 text-primary-foreground font-medium"
+                        : "text-primary-foreground/60 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                     )
                   }
                 >
@@ -53,11 +53,11 @@ export function Layout({ children }: Props) {
             ))}
           </ul>
         </nav>
-        <div className="border-t p-3">
+        <div className="border-t border-primary-foreground/20 p-3">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-muted-foreground"
+            className="w-full justify-start text-primary-foreground/60 hover:bg-primary-foreground/10 hover:text-primary-foreground"
             onClick={logout}
           >
             Sign out

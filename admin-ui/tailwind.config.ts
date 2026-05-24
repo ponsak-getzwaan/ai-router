@@ -34,6 +34,14 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        amber: {
+          DEFAULT: "hsl(var(--amber))",
+          foreground: "hsl(var(--amber-foreground))",
+        },
+        "warm-cream": "hsl(var(--warm-cream))",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -11,7 +11,7 @@ export function ErrorBanner({ message, onRetry, correlationId }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const reportHref = (() => {
-    const subject = encodeURIComponent("AI Router Admin — incident report");
+    const subject = encodeURIComponent("Evidor.ai — incident report");
     const body = encodeURIComponent(
       [
         `Timestamp: ${new Date().toISOString()}`,

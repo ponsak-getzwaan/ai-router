@@ -163,7 +163,9 @@ class _AccuracyStore:
     def render_html(self, generated_at: str) -> str:
         fast_table = self._html_fast_table()
         fps_section = self._html_false_positives()
+        fast_detail = self._html_fast_detail()
         full_section = self._html_full_section()
+        full_detail = self._html_full_detail()
 
         total = len(self.fast)
         hits_zero = sum(1 for r in self.fast if r["hit_at_zero"])
@@ -303,6 +305,12 @@ class _AccuracyStore:
     }}
     .right {{ text-align: right; }}
     .center {{ text-align: center; }}
+    .msg-cell {{ max-width: 420px; word-break: break-word; font-size: 0.82rem; }}
+    tr.row-fp td {{ background: #fff7ed; }}
+    tr.row-fp:hover td {{ background: #fed7aa55; }}
+    tr.row-ok td {{ background: #f0fdf4; }}
+    tr.row-ok:hover td {{ background: #bbf7d055; }}
+    tr.row-miss td {{ background: #f8fafc; }}
   </style>
 </head>
 <body>
@@ -342,7 +350,9 @@ class _AccuracyStore:
 
 {fast_table}
 {fps_section}
+{fast_detail}
 {full_section}
+{full_detail}
 
 <footer>
   Evidor.ai &mdash; Classifier Accuracy Report &mdash; {generated_at}<br>
@@ -351,6 +361,123 @@ class _AccuracyStore:
 
 </body>
 </html>"""
+
+    def _html_fast_detail(self) -> str:
+        if not self.fast:
+            return ""
+
+        rows_html = ""
+        for r in self.fast:
+            hit = r["hit_at_zero"]
+            predicted = r.get("predicted") or "—"
+            correct = r.get("correct")
+            prod = r["hit_production"]
+
+            if hit and not correct:
+                row_cls = "row-fp"
+                result_badge = '<span class="badge badge-red">wrong intent</span>'
+            elif hit and correct:
+                row_cls = "row-ok"
+                result_badge = '<span class="badge badge-green">correct</span>'
+            else:
+                row_cls = "row-miss"
+                result_badge = '<span class="badge badge-slate">no rule hit</span>'
+
+            pred_badge = (
+                f'<span class="badge badge-amber">{html.escape(predicted)}</span>'
+                if hit and not correct
+                else f'<code>{html.escape(predicted)}</code>'
+            )
+            prod_badge = (
+                '<span class="badge badge-forest">yes</span>'
+                if prod
+                else '<span class="badge badge-slate">no</span>'
+            )
+
+            rows_html += f"""
+        <tr class="{row_cls}">
+          <td class="msg-cell">{html.escape(r['message'])}</td>
+          <td><code>{html.escape(r['expected'])}</code></td>
+          <td>{pred_badge}</td>
+          <td class="center">{prod_badge}</td>
+          <td class="center">{result_badge}</td>
+        </tr>"""
+
+        return f"""
+<section>
+  <h2>Fast-path sample detail &mdash; all {len(self.fast)} inputs</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Input message</th>
+        <th>Expected intent</th>
+        <th>Predicted (threshold=0.0)</th>
+        <th class="center">Hits prod threshold</th>
+        <th class="center">Result</th>
+      </tr>
+    </thead>
+    <tbody>{rows_html}
+    </tbody>
+  </table>
+</section>"""
+
+    def _html_full_detail(self) -> str:
+        if not self.full:
+            return ""
+
+        rows_html = ""
+        for r in self.full:
+            row_cls = "row-ok" if r["correct"] else "row-fp"
+            correct_badge = (
+                '<span class="badge badge-green">correct</span>'
+                if r["correct"]
+                else '<span class="badge badge-red">wrong</span>'
+            )
+            esc_badge = (
+                '<span class="badge badge-amber">escalated</span>'
+                if r["escalated"]
+                else ""
+            )
+            path_badge = (
+                '<span class="badge badge-forest">fast</span>'
+                if r["path"] == "fast"
+                else '<span class="badge badge-slate">deep</span>'
+            )
+            pred_cls = "badge-red" if not r["correct"] else ""
+            pred_html = (
+                f'<span class="badge {pred_cls}">{html.escape(r["predicted"])}</span>'
+                if not r["correct"]
+                else f'<code>{html.escape(r["predicted"])}</code>'
+            )
+
+            rows_html += f"""
+        <tr class="{row_cls}">
+          <td class="msg-cell">{html.escape(r['message'])}</td>
+          <td><code>{html.escape(r['expected'])}</code></td>
+          <td>{pred_html}</td>
+          <td class="center">{path_badge}</td>
+          <td class="center">{esc_badge}</td>
+          <td class="center">{correct_badge}</td>
+        </tr>"""
+
+        return f"""
+<section>
+  <h2>Full classifier sample detail &mdash; all {len(self.full)} inputs (@pytest.mark.aws)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Input message</th>
+        <th>Expected intent</th>
+        <th>Predicted intent</th>
+        <th class="center">Path</th>
+        <th class="center">Escalated</th>
+        <th class="center">Result</th>
+      </tr>
+    </thead>
+    <tbody>{rows_html}
+    </tbody>
+  </table>
+</section>"""
 
     def _html_fast_table(self) -> str:
         if not self.fast:

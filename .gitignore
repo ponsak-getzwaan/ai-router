@@ -68,3 +68,6 @@ logs/
 # Editor scratch
 TODO.local.md
 NOTES.local.md
+
+# Generated test reports
+reports/

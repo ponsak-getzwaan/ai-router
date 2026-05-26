@@ -6,8 +6,8 @@ import { RoutingRuleUpdateSchema, type RoutingRuleUpdate, type RoutingRule } fro
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Spinner } from "../components/Spinner";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { NativeSelect } from "../components/ui/select-native";
 import { Textarea } from "../components/ui/textarea";
 import {
   Dialog,
@@ -18,6 +18,20 @@ import {
   DialogFooter,
   DialogClose,
 } from "../components/ui/dialog";
+
+// ---------------------------------------------------------------------------
+// Approved APAC inference profiles (verified active in ap-southeast-1)
+// ---------------------------------------------------------------------------
+
+const VENDOR_OPTIONS: { id: string; label: string }[] = [
+  { id: "apac.anthropic.claude-sonnet-4-20250514-v1:0",    label: "Claude Sonnet 4 (latest)" },
+  { id: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",  label: "Claude 3.5 Sonnet v2" },
+  { id: "apac.anthropic.claude-3-5-sonnet-20240620-v1:0",  label: "Claude 3.5 Sonnet v1" },
+  { id: "apac.anthropic.claude-3-haiku-20240307-v1:0",     label: "Claude 3 Haiku" },
+  { id: "apac.amazon.nova-pro-v1:0",                       label: "Amazon Nova Pro" },
+  { id: "apac.amazon.nova-lite-v1:0",                      label: "Amazon Nova Lite" },
+  { id: "apac.amazon.nova-micro-v1:0",                     label: "Amazon Nova Micro" },
+];
 
 // ---------------------------------------------------------------------------
 // Diff display
@@ -224,37 +238,43 @@ function EditorForm({ rule, intent }: EditorFormProps) {
           <Label htmlFor="vendor">
             Primary vendor <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <NativeSelect
             id="vendor"
-            placeholder="apac.anthropic.claude-sonnet-4-6-..."
             {...register("vendor", { required: "Required" })}
-          />
+          >
+            {VENDOR_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label} — {opt.id}
+              </option>
+            ))}
+          </NativeSelect>
           {errors.vendor && (
             <p className="text-xs text-destructive">{errors.vendor.message}</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Full cross-region inference profile ID (e.g.{" "}
-            <code className="rounded bg-muted px-1">
-              apac.anthropic.claude-sonnet-4-6-20241022-v2:0
-            </code>
-            ). Raw model IDs will fail with "on-demand throughput not supported".
+            All options are confirmed active APAC cross-region inference profiles in ap-southeast-1.
           </p>
         </div>
 
         {/* Fallback */}
         <div className="space-y-1.5">
           <Label htmlFor="fallback">Fallback vendor</Label>
-          <Input
+          <NativeSelect
             id="fallback"
-            placeholder="apac.anthropic.claude-haiku-4-5-... (optional)"
             {...register("fallback")}
-          />
+          >
+            <option value="">— no fallback (escalate to human review) —</option>
+            {VENDOR_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label} — {opt.id}
+              </option>
+            ))}
+          </NativeSelect>
           {errors.fallback && (
             <p className="text-xs text-destructive">{errors.fallback.message}</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Used when the primary vendor fails its health check. Leave blank to
-            escalate to human review on primary failure.
+            Used when the primary vendor fails its health check.
           </p>
         </div>
 

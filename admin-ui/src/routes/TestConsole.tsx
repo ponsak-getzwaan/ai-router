@@ -222,12 +222,49 @@ interface FormValues {
 }
 
 // ---------------------------------------------------------------------------
+// History persistence (localStorage)
+// ---------------------------------------------------------------------------
+
+const HISTORY_KEY = "evidor.testConsole.history";
+const MAX_HISTORY = 100;
+
+function loadHistory(): ChatEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ChatEntry[];
+    // Any entry still pending means the page was navigated away mid-request
+    return parsed.map((e) =>
+      e.pending
+        ? { ...e, pending: false, error: "Request interrupted — page was navigated away." }
+        : e
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: ChatEntry[]): void {
+  try {
+    const trimmed = history.slice(-MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+  } catch {
+    // localStorage quota exceeded — silently ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
 
 export function TestConsole() {
-  const [history, setHistory] = useState<ChatEntry[]>([]);
+  const [history, setHistory] = useState<ChatEntry[]>(loadHistory);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Persist history to localStorage on every change
+  useEffect(() => {
+    saveHistory(history);
+  }, [history]);
 
   const {
     register,
@@ -290,12 +327,16 @@ export function TestConsole() {
             </p>
           </div>
           {history.length > 0 && (
-            <button
-              onClick={() => setHistory([])}
-              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setHistory([]);
+                localStorage.removeItem(HISTORY_KEY);
+              }}
             >
-              Clear history
-            </button>
+              Clear
+            </Button>
           )}
         </div>
       </div>

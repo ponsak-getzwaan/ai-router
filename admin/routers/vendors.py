@@ -118,10 +118,15 @@ def _make_label(profile_id: str) -> str:
 
 def _fetch_profiles(region: str) -> list[dict[str, Any]]:
     client = boto3.client("bedrock", region_name=region)
-    paginator = client.get_paginator("list_inference_profiles")
     profiles: list[dict[str, Any]] = []
-    for page in paginator.paginate():
-        profiles.extend(page.get("inferenceProfileSummaries", []))
+    kwargs: dict[str, Any] = {}
+    while True:
+        response = client.list_inference_profiles(**kwargs)
+        profiles.extend(response.get("inferenceProfileSummaries", []))
+        next_token = response.get("nextToken")
+        if not next_token:
+            break
+        kwargs["nextToken"] = next_token
     return profiles
 
 

@@ -15,6 +15,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from presidio_analyzer import AnalyzerEngine  # type: ignore[import-untyped]
+from presidio_analyzer.nlp_engine import NlpEngineProvider  # type: ignore[import-untyped]
 from presidio_anonymizer import AnonymizerEngine  # type: ignore[import-untyped]
 from presidio_anonymizer.entities import OperatorConfig  # type: ignore[import-untyped]
 from pydantic import BaseModel
@@ -37,7 +38,11 @@ _anonymizer: AnonymizerEngine | None = None
 @app.on_event("startup")
 async def startup() -> None:
     global _analyzer, _anonymizer  # noqa: PLW0603
-    _analyzer = AnalyzerEngine()
+    nlp_engine = NlpEngineProvider(nlp_configuration={
+        "nlp_engine_name": "spacy",
+        "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}],
+    }).create_engine()
+    _analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
     for rec in get_singapore_recognizers():
         _analyzer.registry.add_recognizer(rec)
     _anonymizer = AnonymizerEngine()

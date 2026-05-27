@@ -169,13 +169,28 @@ data "aws_iam_policy_document" "admin_allow" {
     actions   = ["cloudwatch:GetMetricData", "cloudwatch:ListMetrics", "cloudwatch:GetMetricStatistics"]
     resources = ["*"]
   }
+  # Read-only Bedrock metadata for the vendor catalogue endpoint.
+  # Fetches active inference profiles from ap-southeast-1 and us-east-1
+  # to populate the routing rule editor dropdown. No model invocation.
+  statement {
+    actions   = ["bedrock:ListInferenceProfiles"]
+    resources = ["*"]
+  }
 }
 
 data "aws_iam_policy_document" "admin_deny" {
-  # Safety net — admin must never touch Bedrock or hard-delete audit records.
+  # Safety net — admin must never invoke models or hard-delete audit records.
+  # Narrowed from bedrock:* to invocation-only so ListInferenceProfiles is
+  # permitted above. All write/invoke paths remain explicitly denied.
   statement {
-    effect    = "Deny"
-    actions   = ["bedrock:*"]
+    effect = "Deny"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+      "bedrock:InvokeAgent",
+      "bedrock:InvokeFlow",
+      "bedrock:InvokeInlineAgent",
+    ]
     resources = ["*"]
   }
   statement {

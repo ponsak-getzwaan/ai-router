@@ -20,6 +20,23 @@ from shared.errors import BedrockError, BedrockTimeout
 
 BEDROCK_REGION: str = "ap-southeast-1"
 
+# Maps inference profile ID prefix to the AWS region that serves it.
+# apac.* profiles are served from ap-southeast-1 (Singapore cluster).
+# us.* profiles are served from us-east-1.
+_PREFIX_TO_REGION: dict[str, str] = {
+    "apac.": "ap-southeast-1",
+    "us.":   "us-east-1",
+    "eu.":   "eu-west-1",
+}
+
+
+def _region_for_model(model_id: str, default: str = BEDROCK_REGION) -> str:
+    """Return the correct Bedrock endpoint region for a given inference profile ID."""
+    for prefix, region in _PREFIX_TO_REGION.items():
+        if model_id.startswith(prefix):
+            return region
+    return default
+
 
 class BedrockRuntime:
     """Async Bedrock runtime client. One instance per process (persistent connections)."""
@@ -37,15 +54,18 @@ class BedrockRuntime:
 
         Args:
             model_id: Cross-region inference profile ID, e.g. apac.anthropic.claude-haiku-4-5-...
+                      The endpoint region is derived automatically from the ID prefix
+                      (apac.* → ap-southeast-1, us.* → us-east-1).
             body: Request payload (Anthropic Messages API format for Claude models).
 
         Raises:
             BedrockTimeout: on read or connect timeout.
             BedrockError: on any other Bedrock or network error.
         """
+        invoke_region = _region_for_model(model_id, default=self._region)
         try:
             async with self._session.client(
-                "bedrock-runtime", region_name=self._region
+                "bedrock-runtime", region_name=invoke_region
             ) as client:
                 raw_response = await client.invoke_model(
                     modelId=model_id,

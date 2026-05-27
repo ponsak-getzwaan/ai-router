@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI
 
 from admin.auth import require_cognito_token
 from admin.config import AdminConfig
-from admin.routers import audit, escalations, health, metrics, routing_rules, test_console
+from admin.routers import audit, escalations, health, metrics, routing_rules, test_console, vendors
 from admin.services.cloudwatch import CloudWatchService
 from admin.services.dynamo_admin import DynamoAdminService
 from admin.services.redis_admin import RedisAdminService
@@ -68,6 +68,7 @@ app.include_router(escalations.router, dependencies=_auth)
 app.include_router(routing_rules.router, dependencies=_auth)
 app.include_router(audit.router, dependencies=_auth)
 app.include_router(test_console.router, dependencies=_auth)
+app.include_router(vendors.router, dependencies=_auth)
 
 
 @app.get("/health")

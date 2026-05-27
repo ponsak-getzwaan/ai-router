@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useRoutingRule, useUpdateRoutingRule } from "../api/routing-rules";
+import { useVendors, type VendorGroup } from "../api/vendors";
 import { RoutingRuleUpdateSchema, type RoutingRuleUpdate, type RoutingRule } from "../schemas/routing-rules";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Spinner } from "../components/Spinner";
@@ -20,43 +21,24 @@ import {
 } from "../components/ui/dialog";
 
 // ---------------------------------------------------------------------------
-// Approved inference profiles grouped by region
-// APAC: verified active in ap-southeast-1 (2026-05-27)
-// US:   verified active in us-east-1 (2026-05-27) — ~170ms extra latency
-//       Note: US-region calls process data outside SG. Confirm compliance
-//       before assigning US models to SG-user intents.
+// Vendor select — renders optgroups from live /admin/vendors data
 // ---------------------------------------------------------------------------
 
-interface VendorOption { id: string; label: string }
-interface VendorGroup  { region: string; note: string; options: VendorOption[] }
-
-const VENDOR_GROUPS: VendorGroup[] = [
-  {
-    region: "APAC — ap-southeast-1",
-    note: "Singapore region · data residency compliant",
-    options: [
-      { id: "apac.anthropic.claude-sonnet-4-20250514-v1:0",   label: "Claude Sonnet 4 (latest)" },
-      { id: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0", label: "Claude 3.5 Sonnet v2" },
-      { id: "apac.anthropic.claude-3-5-sonnet-20240620-v1:0", label: "Claude 3.5 Sonnet v1" },
-      { id: "apac.anthropic.claude-3-haiku-20240307-v1:0",    label: "Claude 3 Haiku" },
-      { id: "apac.amazon.nova-pro-v1:0",                      label: "Amazon Nova Pro" },
-      { id: "apac.amazon.nova-lite-v1:0",                     label: "Amazon Nova Lite" },
-      { id: "apac.amazon.nova-micro-v1:0",                    label: "Amazon Nova Micro" },
-    ],
-  },
-  {
-    region: "US — us-east-1 (+~170ms latency)",
-    note: "Data processed outside SG — verify compliance before use",
-    options: [
-      { id: "us.meta.llama4-maverick-17b-instruct-v1:0",  label: "Meta Llama 4 Maverick 17B" },
-      { id: "us.meta.llama4-scout-17b-instruct-v1:0",     label: "Meta Llama 4 Scout 17B" },
-      { id: "us.meta.llama3-3-70b-instruct-v1:0",         label: "Meta Llama 3.3 70B" },
-      { id: "us.mistral.pixtral-large-2502-v1:0",         label: "Mistral Pixtral Large" },
-      { id: "us.amazon.nova-premier-v1:0",                label: "Amazon Nova Premier" },
-      { id: "us.deepseek.r1-v1:0",                        label: "DeepSeek R1" },
-    ],
-  },
-];
+function VendorOptGroups({ groups }: { groups: VendorGroup[] }) {
+  return (
+    <>
+      {groups.map((group) => (
+        <optgroup key={group.region} label={`${group.region_label} — ${group.note}`}>
+          {group.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label} — {m.id}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Diff display
@@ -187,9 +169,10 @@ interface FormValues {
 interface EditorFormProps {
   rule: RoutingRule;
   intent: string;
+  vendorGroups: VendorGroup[];
 }
 
-function EditorForm({ rule, intent }: EditorFormProps) {
+function EditorForm({ rule, intent, vendorGroups }: EditorFormProps) {
   const navigate = useNavigate();
   const update = useUpdateRoutingRule(intent);
 
@@ -271,15 +254,7 @@ function EditorForm({ rule, intent }: EditorFormProps) {
             id="vendor"
             {...register("vendor", { required: "Required" })}
           >
-            {VENDOR_GROUPS.map((group) => (
-              <optgroup key={group.region} label={`${group.region} — ${group.note}`}>
-                {group.options.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label} — {opt.id}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
+            <VendorOptGroups groups={vendorGroups} />
           </NativeSelect>
           {errors.vendor && (
             <p className="text-xs text-destructive">{errors.vendor.message}</p>
@@ -299,15 +274,7 @@ function EditorForm({ rule, intent }: EditorFormProps) {
             {...register("fallback")}
           >
             <option value="">— no fallback (escalate to human review) —</option>
-            {VENDOR_GROUPS.map((group) => (
-              <optgroup key={group.region} label={`${group.region} — ${group.note}`}>
-                {group.options.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label} — {opt.id}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
+            <VendorOptGroups groups={vendorGroups} />
           </NativeSelect>
           {errors.fallback && (
             <p className="text-xs text-destructive">{errors.fallback.message}</p>
@@ -376,6 +343,7 @@ export function RoutingRuleEditor() {
   const decoded = intent ? decodeURIComponent(intent) : "";
 
   const { data: rule, isLoading, isError, error, refetch } = useRoutingRule(decoded);
+  const { data: vendorGroups = [], isLoading: vendorsLoading } = useVendors();
 
   return (
     <div className="space-y-6">
@@ -422,7 +390,13 @@ export function RoutingRuleEditor() {
 
       {rule && (
         <div className="rounded-lg border bg-card p-6">
-          <EditorForm rule={rule} intent={decoded} />
+          {vendorsLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground pb-4">
+              <Spinner className="h-4 w-4" />
+              <span className="text-sm">Loading available models…</span>
+            </div>
+          ) : null}
+          <EditorForm rule={rule} intent={decoded} vendorGroups={vendorGroups} />
         </div>
       )}
     </div>

@@ -13,29 +13,32 @@ import boto3
 TABLE = "ai-router-routing-rules"
 REGION = "ap-southeast-1"
 
+_SONNET = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
+_HAIKU  = "apac.anthropic.claude-3-haiku-20240307-v1:0"
+
 RULES = [
     {
         "intent": "general_qa",
-        "vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
-        "fallback": "apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+        "vendor": _SONNET,
+        "fallback": _HAIKU,
         "description": "General questions and explanations",
     },
     {
         "intent": "code_assistance",
-        "vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
-        "fallback": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        "vendor": _SONNET,
+        "fallback": _HAIKU,
         "description": "Coding, debugging, programming help",
     },
     {
         "intent": "simple_transactional",
-        "vendor": "apac.anthropic.claude-haiku-4-5-20241022-v1:0",
-        "fallback": "apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+        "vendor": _HAIKU,
+        "fallback": _HAIKU,
         "description": "Quick lookups, prices, hours — Haiku is cheaper and fast enough",
     },
     {
         "intent": "ambiguous",
-        "vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
-        "fallback": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        "vendor": _SONNET,
+        "fallback": _HAIKU,
         "description": "Ambiguous intent — use Sonnet for best chance of a useful response",
     },
 ]

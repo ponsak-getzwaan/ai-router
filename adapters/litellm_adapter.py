@@ -23,9 +23,23 @@ litellm.set_verbose = False  # type: ignore[attr-defined]
 litellm.drop_params = True  # ignore unknown params silently
 
 
+_PREFIX_TO_REGION: dict[str, str] = {
+    "apac.": "ap-southeast-1",
+    "us.":   "us-east-1",
+    "eu.":   "eu-west-1",
+}
+
+
 def _litellm_model(inference_profile_id: str) -> str:
     """Convert a Bedrock inference profile ID to LiteLLM's bedrock/ prefix format."""
     return f"bedrock/{inference_profile_id}"
+
+
+def _region_for(inference_profile_id: str) -> str:
+    for prefix, region in _PREFIX_TO_REGION.items():
+        if inference_profile_id.startswith(prefix):
+            return region
+    return "ap-southeast-1"
 
 
 async def invoke(
@@ -77,25 +91,27 @@ async def _call_litellm(
     max_retries: int,
 ) -> str:
     model = _litellm_model(inference_profile_id)
+    region = _region_for(inference_profile_id)
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": message},
     ]
 
     if streaming:
-        return await _collect_stream(model, messages, max_retries)
+        return await _collect_stream(model, region, messages, max_retries)
 
     response = await litellm.acompletion(
         model=model,
         messages=messages,
         num_retries=max_retries,
+        aws_region_name=region,
     )
     content: str = response.choices[0].message.content or ""
     return content
 
 
 async def _collect_stream(
-    model: str, messages: list[dict[str, str]], max_retries: int
+    model: str, region: str, messages: list[dict[str, str]], max_retries: int
 ) -> str:
     chunks: list[str] = []
     response = await litellm.acompletion(
@@ -103,6 +119,7 @@ async def _collect_stream(
         messages=messages,
         stream=True,
         num_retries=max_retries,
+        aws_region_name=region,
     )
     async for chunk in response:
         delta = chunk.choices[0].delta

@@ -10,14 +10,9 @@ from __future__ import annotations
 from shared.logging import safe_log
 from shared.models import ClassifiedIntent, PipelineEnvelope, RoutingPlan
 
-# Vendors that are approved for ap-southeast-1 data residency.
-# All are Bedrock inference profiles — non-Bedrock vendors are always blocked.
-_APPROVED_VENDORS: frozenset[str] = frozenset(
-    {
-        "apac.anthropic.claude-3-haiku-20240307-v1:0",
-        "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
-    }
-)
+# Vendor prefix approved for ap-southeast-1 data residency.
+# Any apac.* Bedrock inference profile keeps data in the APAC cluster.
+_APPROVED_PREFIX: str = "apac."
 
 # Intent categories blocked for legal/compliance reasons (MAS regulation, etc.)
 _BLOCKED_INTENTS: frozenset[str] = frozenset(
@@ -43,8 +38,8 @@ def apply_policies(
     blocked = False
     primary_vendor = plan.primary_vendor
 
-    # 1. Data residency — vendor must be an approved APAC Bedrock profile
-    if primary_vendor not in _APPROVED_VENDORS:
+    # 1. Data residency — vendor must be an apac.* Bedrock inference profile
+    if not primary_vendor.startswith(_APPROVED_PREFIX):
         safe_log.warning(
             "policy.residency.blocked",
             vendor=primary_vendor,

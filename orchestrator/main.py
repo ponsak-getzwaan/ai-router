@@ -54,6 +54,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         strategist=strategist,
         audit=audit,
         vault_ttl_seconds=_config.vault_ttl_seconds,
+        sqs_escalation_url=_config.sqs_escalation_url,
+        aws_region=_config.aws_region,
     )
 
     _consumer = SQSConsumer(_config, driver)

@@ -23,10 +23,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import time
 from datetime import UTC, datetime
 from uuid import UUID
 
+import aioboto3  # type: ignore[import-untyped]
 import redis.asyncio as aioredis
 
 import adapters.litellm_adapter as vendor_adapter
@@ -57,6 +59,8 @@ class PipelineDriver:
         strategist: Strategist,
         audit: AuditLogger,
         vault_ttl_seconds: int = 300,
+        sqs_escalation_url: str = "",
+        aws_region: str = "ap-southeast-1",
     ) -> None:
         self._presidio = presidio
         self._vault = TokenVault(redis, ttl_seconds=vault_ttl_seconds)
@@ -64,6 +68,9 @@ class PipelineDriver:
         self._classifier = classifier
         self._strategist = strategist
         self._audit = audit
+        self._sqs_escalation_url = sqs_escalation_url
+        self._aws_region = aws_region
+        self._sqs_session: aioboto3.Session = aioboto3.Session()
 
     async def run(
         self,
@@ -138,6 +145,7 @@ class PipelineDriver:
                     confidence=intent.confidence,
                     escalate=True,
                 )
+                await self._send_escalation(envelope, bounce)
                 return "Your request has been sent for human review."
 
             # Step 7: Strategist
@@ -179,3 +187,32 @@ class PipelineDriver:
 
             # Step 11: Vault cleanup — always runs
             await self._vault.delete(cid_str)
+
+    async def _send_escalation(
+        self,
+        envelope: PipelineEnvelope,
+        bounce: BounceResult | None,
+    ) -> None:
+        if not self._sqs_escalation_url:
+            safe_log.warning("pipeline.escalation.no_queue_url")
+            return
+        payload = json.dumps({
+            "correlation_id": str(envelope.correlation_id),
+            "user_sub": envelope.user_sub,
+            "session_id": envelope.session_id,
+            "redacted_message": envelope.redacted_message,
+            "entity_types": list(envelope.entity_types_redacted),
+            "bouncer_reason": bounce.reason if bounce else None,
+        })
+        try:
+            async with self._sqs_session.client("sqs", region_name=self._aws_region) as sqs:
+                await sqs.send_message(
+                    QueueUrl=self._sqs_escalation_url,
+                    MessageBody=payload,
+                )
+            safe_log.info(
+                "pipeline.escalation.sent",
+                correlation_id=str(envelope.correlation_id),
+            )
+        except Exception as exc:
+            safe_log.warning("pipeline.escalation.send_error", error_type=type(exc).__name__)

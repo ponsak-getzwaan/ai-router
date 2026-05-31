@@ -1,18 +1,14 @@
 """Policy engine: runs after vendor selection.
 
-Enforces data residency and compliance blocks.
-Non-negotiable: selecting a non-ap-southeast-1 vendor for an SG user
-must be blocked here (CLAUDE.md §7 Strategist).
+Enforces compliance blocks. Data residency is the admin's responsibility —
+the routing rule editor shows a compliance warning for us.* models, and the
+admin's explicit choice is honoured here without override.
 """
 
 from __future__ import annotations
 
 from shared.logging import safe_log
 from shared.models import ClassifiedIntent, PipelineEnvelope, RoutingPlan
-
-# Vendor prefix approved for ap-southeast-1 data residency.
-# Any apac.* Bedrock inference profile keeps data in the APAC cluster.
-_APPROVED_PREFIX: str = "apac."
 
 # Intent categories blocked for legal/compliance reasons (MAS regulation, etc.)
 _BLOCKED_INTENTS: frozenset[str] = frozenset(
@@ -38,19 +34,7 @@ def apply_policies(
     blocked = False
     primary_vendor = plan.primary_vendor
 
-    # 1. Data residency — vendor must be an apac.* Bedrock inference profile
-    if not primary_vendor.startswith(_APPROVED_PREFIX):
-        safe_log.warning(
-            "policy.residency.blocked",
-            vendor=primary_vendor,
-            blocked=True,
-            applied_policies=["sg_residency"],
-        )
-        primary_vendor = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
-        applied.append("sg_residency")
-        blocked = False  # rerouted, not hard-blocked
-
-    # 2. Compliance blocks
+    # Compliance blocks
     if intent.intent in _BLOCKED_INTENTS:
         safe_log.warning(
             "policy.compliance.blocked",

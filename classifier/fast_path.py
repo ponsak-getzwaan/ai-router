@@ -56,7 +56,7 @@ _RULES: tuple[_Rule, ...] = (
         re.compile(
             r"\b(explain|describe|summarise|summarize|tell me|"
             r"how does|how do|how can|why does|what does|can you|could you|"
-            r"help me understand|I want to know)\b",
+            r"do you|are you|help me understand|I want to know)\b",
             re.IGNORECASE,
         ),
         intent="general_qa",

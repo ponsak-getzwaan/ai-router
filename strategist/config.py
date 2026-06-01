@@ -21,8 +21,8 @@ class StrategistConfig(BaseSettings):
     default_vendor: str = Field(default="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
 
     # Timeouts (seconds) used in the RoutingContext
-    haiku_timeout_s: float = Field(default=3.0)
-    sonnet_timeout_s: float = Field(default=8.0)
+    haiku_timeout_s: float = Field(default=15.0)
+    sonnet_timeout_s: float = Field(default=30.0)
 
     # Infrastructure
     bedrock_region: str = Field(default="ap-southeast-1")

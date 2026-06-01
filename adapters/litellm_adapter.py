@@ -103,6 +103,7 @@ async def _call_litellm(
     response = await litellm.acompletion(
         model=model,
         messages=messages,
+        max_tokens=1024,
         num_retries=max_retries,
         aws_region_name=region,
     )
@@ -118,6 +119,7 @@ async def _collect_stream(
         model=model,
         messages=messages,
         stream=True,
+        max_tokens=1024,
         num_retries=max_retries,
         aws_region_name=region,
     )

@@ -43,7 +43,7 @@ _RULES: tuple[_Rule, ...] = (
     # Simple transactional — short, imperative, lookup-style
     _Rule(
         re.compile(
-            r"\b(what is|what are|who is|when is|where is|how much|"
+            r"\b(what is|what are|who is|who are|when is|where is|how much|"
             r"price of|cost of|opening hours|contact|phone number|address)\b",
             re.IGNORECASE,
         ),
@@ -55,7 +55,7 @@ _RULES: tuple[_Rule, ...] = (
     _Rule(
         re.compile(
             r"\b(explain|describe|summarise|summarize|tell me|"
-            r"how does|why does|what does|can you|could you|"
+            r"how does|how do|how can|why does|what does|can you|could you|"
             r"help me understand|I want to know)\b",
             re.IGNORECASE,
         ),

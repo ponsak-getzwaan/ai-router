@@ -55,17 +55,23 @@ class DeepPathClassifier:
         self._config = config
         self._bedrock = bedrock
 
-    async def classify(self, envelope: PipelineEnvelope) -> ClassifiedIntent:
+    async def classify(
+        self,
+        envelope: PipelineEnvelope,
+        history: list[dict[str, str]] | None = None,
+    ) -> ClassifiedIntent:
         """Call Sonnet and parse the classification result.
 
         On Bedrock error, returns an ambiguous/escalate result (fail-safe,
         not fail-open — unlike the Bouncer, the classifier CAN escalate).
         """
+        # Prepend up to the last 4 turns (2 exchanges) for follow-up context.
+        prior: list[dict[str, Any]] = list(history[-4:]) if history else []
         body: dict[str, Any] = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": self._config.sonnet_max_tokens,
             "system": _SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": envelope.redacted_message}],
+            "messages": prior + [{"role": "user", "content": envelope.redacted_message}],
         }
 
         try:

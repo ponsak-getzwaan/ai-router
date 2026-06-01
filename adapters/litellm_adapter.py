@@ -46,6 +46,7 @@ async def invoke(
     envelope: PipelineEnvelope,
     plan: RoutingPlan,
     system_prompt: str = "You are a helpful assistant.",
+    history: list[dict[str, str]] | None = None,
 ) -> str:
     """Call the primary vendor and return the full response text.
 
@@ -64,6 +65,7 @@ async def invoke(
                     system_prompt,
                     plan.context.streaming,
                     plan.context.max_retries,
+                    history=history,
                 ),
                 timeout=plan.context.timeout_seconds,
             )
@@ -89,13 +91,15 @@ async def _call_litellm(
     system_prompt: str,
     streaming: bool,
     max_retries: int,
+    history: list[dict[str, str]] | None = None,
 ) -> str:
     model = _litellm_model(inference_profile_id)
     region = _region_for(inference_profile_id)
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message},
-    ]
+    # Build messages: system first, then last 4 history turns, then current user
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    if history:
+        messages.extend(history[-4:])
+    messages.append({"role": "user", "content": message})
 
     if streaming:
         return await _collect_stream(model, region, messages, max_retries)

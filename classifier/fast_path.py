@@ -66,6 +66,38 @@ _RULES: tuple[_Rule, ...] = (
 )
 
 
+_FOLLOWUP_PREFIXES: tuple[str, ...] = (
+    "continue",
+    "what about",
+    "and also",
+    "and what",
+    "so what",
+    "tell me more",
+    "more about",
+    "elaborate",
+    "go on",
+    "but what",
+    "okay,",
+    "sure,",
+    "actually,",
+    "wait,",
+)
+_FOLLOWUP_MAX_CHARS = 15
+
+
+def is_followup(message: str) -> bool:
+    """Return True if the message looks like a continuation of a prior turn.
+
+    Short messages (≤15 chars) and messages starting with continuation phrases
+    are treated as follow-ups. The caller decides whether to skip the fast path.
+    """
+    stripped = message.strip()
+    if len(stripped) <= _FOLLOWUP_MAX_CHARS:
+        return True
+    lower = stripped.lower()
+    return any(lower.startswith(p) for p in _FOLLOWUP_PREFIXES)
+
+
 def classify_fast(
     message: str,
     threshold: float,

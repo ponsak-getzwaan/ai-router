@@ -19,6 +19,7 @@ from classifier.classifier import Classifier
 from classifier.config import ClassifierConfig
 from orchestrator.audit import AuditLogger
 from orchestrator.config import OrchestratorConfig
+from orchestrator.history import SessionHistory
 from orchestrator.pipeline_driver import PipelineDriver
 from orchestrator.presidio_client import PresidioClient
 from orchestrator.sqs_consumer import SQSConsumer
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     classifier = Classifier(ClassifierConfig(), bedrock)
     strategist = Strategist(StrategistConfig(), bedrock)
     audit = AuditLogger(_config.dynamodb_audit_table, _config.aws_region)
+    history = SessionHistory(redis)
 
     driver = PipelineDriver(
         presidio=presidio,
@@ -53,6 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         classifier=classifier,
         strategist=strategist,
         audit=audit,
+        history=history,
         vault_ttl_seconds=_config.vault_ttl_seconds,
         sqs_escalation_url=_config.sqs_escalation_url,
         aws_region=_config.aws_region,

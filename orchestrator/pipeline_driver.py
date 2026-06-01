@@ -35,6 +35,7 @@ import adapters.litellm_adapter as vendor_adapter
 from bouncer.bouncer import Bouncer
 from classifier.classifier import Classifier
 from orchestrator.audit import AuditLogger
+from orchestrator.history import SessionHistory
 from orchestrator.presidio_client import PresidioClient
 from orchestrator.vault import TokenVault
 from shared.errors import PresidioError
@@ -58,6 +59,7 @@ class PipelineDriver:
         classifier: Classifier,
         strategist: Strategist,
         audit: AuditLogger,
+        history: SessionHistory,
         vault_ttl_seconds: int = 300,
         sqs_escalation_url: str = "",
         aws_region: str = "ap-southeast-1",
@@ -68,6 +70,7 @@ class PipelineDriver:
         self._classifier = classifier
         self._strategist = strategist
         self._audit = audit
+        self._history = history
         self._sqs_escalation_url = sqs_escalation_url
         self._aws_region = aws_region
         self._sqs_session: aioboto3.Session = aioboto3.Session()
@@ -135,8 +138,9 @@ class PipelineDriver:
                 )
                 return "Your request cannot be processed at this time."
 
-            # Step 6: Classifier
-            intent = await self._classifier.classify(envelope)
+            # Step 6: Classifier — load history first for follow-up detection
+            history_turns = await self._history.get(session_id)
+            intent = await self._classifier.classify(envelope, history=history_turns or None)
             asyncio.create_task(emit_classifier(intent, envelope.bedrock_region))
             if intent.escalate:
                 safe_log.info(
@@ -155,8 +159,16 @@ class PipelineDriver:
                 safe_log.info("pipeline.policy_blocked", blocked=True)
                 return "This request cannot be processed due to compliance restrictions."
 
-            # Step 8: Vendor adapter
-            vendor_response = await vendor_adapter.invoke(envelope, plan)
+            # Step 8: Vendor adapter — pass history for multi-turn context
+            vendor_response = await vendor_adapter.invoke(
+                envelope, plan, history=history_turns or None
+            )
+
+            # Persist the exchange (vault-tokenized form, before restore) so
+            # future turns can reference prior context without exposing raw PII.
+            await self._history.append(
+                session_id, envelope.redacted_message, vendor_response
+            )
 
             # Step 9: De-redact — restore tokens in the vendor response
             restored = await self._vault.restore(cid_str, vendor_response)

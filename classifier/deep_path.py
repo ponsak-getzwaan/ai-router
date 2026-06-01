@@ -19,6 +19,11 @@ from shared.logging import safe_log
 from shared.models import ClassifiedIntent, ClassifierPath, IntentDomain, PipelineEnvelope
 
 _SYSTEM_PROMPT = """You are an intent classifier for a customer service AI router.
+
+IMPORTANT: Messages may contain tokens like VAULT_XXXXXXXXXX. These are redacted PII \
+values (e.g. NRIC, credit card numbers, passport numbers). Treat them as stand-ins for \
+sensitive personal data and classify the message based on the surrounding context and intent.
+
 Classify the user message into one of these intents:
 - general_qa: general questions, explanations, summaries
 - code_assistance: coding, debugging, programming help

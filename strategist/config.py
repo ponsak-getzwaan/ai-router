@@ -10,7 +10,7 @@ class StrategistConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="STRATEGIST_")
 
     # Confidence thresholds (CLAUDE.md §7 Strategist)
-    deterministic_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
+    deterministic_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     escalate_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Haiku arbitration

@@ -16,8 +16,8 @@ from strategist.config import StrategistConfig
 from strategist.policy_engine import apply_policies
 from strategist.vendor_selector import VendorSelector
 
-_HAIKU_ID = "apac.anthropic.claude-3-haiku-20240307-v1:0"
-_SONNET_ID = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
+_HAIKU_ID = "apac.anthropic.claude-haiku-4-5-20241022-v1:0"
+_SONNET_ID = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
 
 
 class Strategist:

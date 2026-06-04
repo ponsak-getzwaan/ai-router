@@ -98,7 +98,7 @@ def _stub_healthy_dynamo(mock_boto: MagicMock) -> None:
 def _stub_failing_dynamo(mock_boto: MagicMock) -> None:
     mock_session = MagicMock()
     failing_client = AsyncMock()
-    failing_client.describe_table = AsyncMock(side_effect=Exception("ResourceNotFoundException"))
+    failing_client.scan = AsyncMock(side_effect=Exception("ResourceNotFoundException"))
     mock_session.client.return_value.__aenter__ = AsyncMock(return_value=failing_client)
     mock_session.client.return_value.__aexit__ = AsyncMock(return_value=False)
     mock_boto.Session.return_value = mock_session

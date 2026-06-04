@@ -16,6 +16,7 @@ import fakeredis.aioredis
 import pytest
 
 from orchestrator.audit import AuditLogger
+from orchestrator.history import SessionHistory
 from orchestrator.pipeline_driver import PipelineDriver
 from orchestrator.presidio_client import PresidioClient
 from shared.models import (
@@ -37,6 +38,16 @@ INCOMING_QUEUE = "ai-router-incoming"
 
 # Fixed UUID used in RedactionResult so fixtures don't need to coordinate
 _FIXED_CID = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+
+@pytest.fixture(autouse=True)
+def _mock_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Suppress fire-and-forget metric tasks that create dangling aiohttp connections."""
+    async def _noop(*args: object, **kwargs: object) -> None:
+        pass
+
+    monkeypatch.setattr("orchestrator.pipeline_driver.emit_classifier", _noop)
+    monkeypatch.setattr("orchestrator.pipeline_driver.emit_strategist", _noop)
 
 
 @pytest.fixture(autouse=True)
@@ -152,6 +163,14 @@ def mock_audit() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_history() -> AsyncMock:
+    h = AsyncMock(spec=SessionHistory)
+    h.get = AsyncMock(return_value=[])
+    h.append = AsyncMock()
+    return h
+
+
+@pytest.fixture
 def driver(
     redis_client,
     mock_presidio,
@@ -159,6 +178,7 @@ def driver(
     mock_classifier,
     mock_strategist,
     mock_audit,
+    mock_history,
 ) -> PipelineDriver:
     return PipelineDriver(
         presidio=mock_presidio,
@@ -167,4 +187,5 @@ def driver(
         classifier=mock_classifier,
         strategist=mock_strategist,
         audit=mock_audit,
+        history=mock_history,
     )

@@ -189,14 +189,15 @@ class AuditQuery(_Out):
 class TestConsoleRequest(_Out):
     """Input for the test console.
 
-    The message is submitted to the real pipeline via SQS. Presidio redaction
-    runs first so PII is safe to include. The audit log never stores content.
+    Accepts a pre-redacted message and traces it through Bouncer → Classifier →
+    Strategist directly (no SQS, no Presidio, no vault). The audit log never
+    stores content.
     """
 
-    message: str = Field(
+    redacted_message: str = Field(
         min_length=1,
         max_length=4096,
-        description="Message to send through the pipeline. PII is redacted by Presidio.",
+        description="Pre-redacted message to trace through the pipeline.",
     )
     user_sub: str = Field(
         default="admin-test-user",
@@ -204,6 +205,10 @@ class TestConsoleRequest(_Out):
         max_length=128,
     )
     session_id: str = Field(default="admin-test-session", min_length=1, max_length=128)
+    dry_run: bool = Field(
+        default=True,
+        description="When True, vendor adapter is not invoked.",
+    )
 
 
 class TestConsoleLayerResult(_Out):
@@ -214,6 +219,7 @@ class TestConsoleLayerResult(_Out):
 
 class TestConsoleResponse(_Out):
     correlation_id: str
+    dry_run: bool
     layers: list[TestConsoleLayerResult]
     final_vendor: str | None
     total_latency_ms: float

@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from admin.auth import require_cognito_token
 from admin.config import AdminConfig
 from admin.main import app as admin_app
 from admin.models import (
@@ -206,6 +208,12 @@ async def ctx() -> AdminCtx:  # type: ignore[misc]
         )
     )
 
+    # Bypass Cognito JWT validation in tests
+    async def _mock_auth() -> dict[str, Any]:
+        return {"sub": "test-admin-user", "token_use": "access"}
+
+    admin_app.dependency_overrides[require_cognito_token] = _mock_auth
+
     # Populate app.state directly — bypasses lifespan
     admin_app.state.config = AdminConfig()
     admin_app.state.cloudwatch = mock_cw
@@ -225,7 +233,8 @@ async def ctx() -> AdminCtx:  # type: ignore[misc]
             redis=mock_redis,
         )
 
-    # Clean up state to prevent bleed between tests
+    # Clean up state and dependency overrides to prevent bleed between tests
+    admin_app.dependency_overrides.clear()
     for attr in ("config", "cloudwatch", "dynamo", "sqs_admin", "redis"):
         try:
             delattr(admin_app.state, attr)

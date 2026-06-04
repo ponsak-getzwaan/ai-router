@@ -25,16 +25,16 @@ class TestAuditQuery:
 
     async def test_default_limit_is_50(self, ctx: AdminCtx) -> None:
         await ctx.client.get("/admin/audit")
-        ctx.dynamo.query_audit.assert_called_once_with(correlation_id=None, limit=50)
+        ctx.dynamo.query_audit.assert_called_once_with(correlation_id=None, limit=50, last_key=None)
 
     async def test_custom_limit_forwarded(self, ctx: AdminCtx) -> None:
         await ctx.client.get("/admin/audit?limit=10")
-        ctx.dynamo.query_audit.assert_called_once_with(correlation_id=None, limit=10)
+        ctx.dynamo.query_audit.assert_called_once_with(correlation_id=None, limit=10, last_key=None)
 
     async def test_correlation_id_forwarded(self, ctx: AdminCtx) -> None:
         await ctx.client.get("/admin/audit?correlation_id=test-cid-001")
         ctx.dynamo.query_audit.assert_called_once_with(
-            correlation_id="test-cid-001", limit=50
+            correlation_id="test-cid-001", limit=50, last_key=None
         )
 
     async def test_limit_above_100_returns_422(self, ctx: AdminCtx) -> None:

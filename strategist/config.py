@@ -14,11 +14,11 @@ class StrategistConfig(BaseSettings):
     escalate_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Haiku arbitration
-    haiku_model_id: str = Field(default="apac.anthropic.claude-3-haiku-20240307-v1:0")
+    haiku_model_id: str = Field(default="apac.anthropic.claude-haiku-4-5-20241022-v1:0")
     haiku_max_tokens: int = Field(default=80)
 
     # Default vendor when no rule matches
-    default_vendor: str = Field(default="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
+    default_vendor: str = Field(default="apac.anthropic.claude-sonnet-4-6-20241022-v2:0")
 
     # Timeouts (seconds) used in the RoutingContext
     haiku_timeout_s: float = Field(default=15.0)

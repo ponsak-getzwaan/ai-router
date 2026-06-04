@@ -137,6 +137,15 @@ class PipelineDriver:
                     layer=bounce.layer,
                 )
                 return "Your request cannot be processed at this time."
+            if bounce.escalate:
+                safe_log.info(
+                    "pipeline.escalated",
+                    reason=bounce.reason,
+                    confidence=bounce.confidence,
+                    escalate=True,
+                )
+                await self._send_escalation(envelope, bounce)
+                return "Your request has been sent for human review."
 
             # Step 6: Classifier — load history first for follow-up detection
             history_turns = await self._history.get(session_id)

@@ -62,12 +62,13 @@ def make_redaction_result(
     )
 
 
-def make_bounce(allowed: bool = True) -> BounceResult:
+def make_bounce(allowed: bool = True, escalate: bool = False) -> BounceResult:
     return BounceResult(
         allowed=allowed,
         reason="safe" if allowed else "banned_user",
         layer=BouncerLayer.LLM_CLASSIFIER,
         confidence=0.9,
+        escalate=escalate,
     )
 
 
@@ -123,6 +124,10 @@ async def make_driver(
     audit = AsyncMock()
     audit.write = AsyncMock()
 
+    history = AsyncMock()
+    history.get = AsyncMock(return_value=[])
+    history.append = AsyncMock()
+
     driver = PipelineDriver(
         presidio=presidio,
         redis=redis,
@@ -130,6 +135,7 @@ async def make_driver(
         classifier=classifier,
         strategist=strategist,
         audit=audit,
+        history=history,
         vault_ttl_seconds=300,
     )
     return driver, redis
@@ -212,6 +218,38 @@ async def test_bouncer_block_returns_cannot_process_message() -> None:
 
 async def test_bouncer_block_skips_classifier() -> None:
     driver, _ = await make_driver(bounce_result=make_bounce(allowed=False))
+
+    with patch("orchestrator.pipeline_driver.vendor_adapter.invoke", new_callable=AsyncMock):
+        await driver.run(
+            raw_message=_RAW_MESSAGE,
+            user_sub=_USER_SUB,
+            session_id=_SESSION_ID,
+            correlation_id=uuid4(),
+            source_ip=_SOURCE_IP,
+        )
+
+    driver._classifier.classify.assert_not_called()  # type: ignore[attr-defined]
+
+
+async def test_bouncer_escalate_returns_human_review_message() -> None:
+    """Haiku flags message as harmful (escalate=True, allowed=True) → pipeline stops."""
+    driver, _ = await make_driver(bounce_result=make_bounce(allowed=True, escalate=True))
+
+    with patch("orchestrator.pipeline_driver.vendor_adapter.invoke", new_callable=AsyncMock):
+        result = await driver.run(
+            raw_message=_RAW_MESSAGE,
+            user_sub=_USER_SUB,
+            session_id=_SESSION_ID,
+            correlation_id=uuid4(),
+            source_ip=_SOURCE_IP,
+        )
+
+    assert "human review" in result.lower()
+
+
+async def test_bouncer_escalate_skips_classifier() -> None:
+    """When Bouncer escalates, Classifier must not be called."""
+    driver, _ = await make_driver(bounce_result=make_bounce(allowed=True, escalate=True))
 
     with patch("orchestrator.pipeline_driver.vendor_adapter.invoke", new_callable=AsyncMock):
         await driver.run(

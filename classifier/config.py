@@ -11,7 +11,7 @@ class ClassifierConfig(BaseSettings):
 
     # Fast path — embedding similarity
     fast_path_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    titan_model_id: str = Field(default="amazon.titan-embed-text-v2:0")
+    cohere_model_id: str = Field(default="cohere.embed-multilingual-v3")
 
     # Deep path — Sonnet
     sonnet_model_id: str = Field(default="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")

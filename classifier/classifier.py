@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from classifier.config import ClassifierConfig
 from classifier.deep_path import DeepPathClassifier
-from classifier.fast_path import classify_fast, is_followup
+from classifier.fast_path import EmbeddingFastPath, is_followup
 from shared.bedrock import BedrockRuntime
 from shared.logging import safe_log
 from shared.models import ClassifiedIntent, PipelineEnvelope
@@ -13,7 +13,12 @@ from shared.models import ClassifiedIntent, PipelineEnvelope
 class Classifier:
     def __init__(self, config: ClassifierConfig, bedrock: BedrockRuntime) -> None:
         self._config = config
+        self._fast = EmbeddingFastPath(config, bedrock)
         self._deep = DeepPathClassifier(config, bedrock)
+
+    async def initialize(self) -> None:
+        """Embed exemplars at start-up so first-request latency is predictable."""
+        await self._fast.initialize()
 
     async def classify(
         self,
@@ -21,12 +26,11 @@ class Classifier:
         history: list[dict[str, str]] | None = None,
     ) -> ClassifiedIntent:
         # Skip fast path when we have history context and the message looks like
-        # a follow-up — keyword rules can't account for prior conversation turns.
+        # a follow-up — embedding similarity can't account for prior conversation turns.
         if history and is_followup(envelope.redacted_message):
             safe_log.info("classifier.followup_detected")
         else:
-            # Fast path — keyword heuristics, no LLM
-            fast_result = classify_fast(
+            fast_result = await self._fast.classify(
                 envelope.redacted_message, self._config.fast_path_threshold
             )
             if fast_result is not None:

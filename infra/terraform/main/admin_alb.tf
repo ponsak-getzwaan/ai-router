@@ -34,6 +34,7 @@ resource "aws_lb" "admin" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.admin_alb.id]
   subnets            = aws_subnet.public[*].id
+  idle_timeout       = 60
 }
 
 resource "aws_lb_target_group" "admin" {

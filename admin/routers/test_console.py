@@ -155,6 +155,8 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
             "confidence": intent.confidence,
             "escalate": intent.escalate,
             "path": str(intent.path),
+            "history_turns": len(history),
+            "reasoning": intent.reasoning,
         }))
         if intent.escalate:
             await _enqueue_escalation(cfg, envelope, correlation_id, bouncer_reason=None)
@@ -190,9 +192,11 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         t0 = time.monotonic()
         try:
             vendor_response = await litellm_invoke(envelope, non_streaming_plan)
-            layers.append(_layer("adapter", t0, {"vendor": final_vendor}))
+            history_stored = False
             if vendor_response:
                 await session_history.append(body.session_id, body.redacted_message, vendor_response)
+                history_stored = True
+            layers.append(_layer("adapter", t0, {"vendor": final_vendor, "history_stored": history_stored}))
         except Exception as exc:
             layers.append(_layer("adapter", t0, {"error_type": type(exc).__name__}))
 

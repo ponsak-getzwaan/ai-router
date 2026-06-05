@@ -10,6 +10,7 @@ Phase 2 — stubs here emit warnings so they're easy to find and upgrade.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from classifier.config import ClassifierConfig
@@ -81,7 +82,12 @@ class DeepPathClassifier:
         try:
             response = await self._bedrock.invoke_model(self._config.sonnet_model_id, body)
             text: str = response["content"][0]["text"]
-            parsed: dict[str, Any] = json.loads(text)
+            # Sonnet sometimes adds a preamble when conversation history is present.
+            # Extract the JSON object regardless of surrounding text.
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if not match:
+                raise ValueError("no JSON object in response")
+            parsed: dict[str, Any] = json.loads(match.group())
 
             intent_str: str = str(parsed.get("intent", "ambiguous"))
             domain = _DOMAIN_MAP.get(intent_str, IntentDomain.AMBIGUOUS)
@@ -110,14 +116,19 @@ class DeepPathClassifier:
             )
 
         except (BedrockError, KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
+            err_label = type(exc).__name__
+            # exc.args[0] for BedrockError contains the underlying boto3 exception class
+            # name (e.g. "ClientError"), safe to surface — no user content.
+            err_detail = str(exc.args[0]) if exc.args else ""
             safe_log.warning(
-                "classifier.deep_path.error", error_type=type(exc).__name__, escalate=True
+                "classifier.deep_path.error", error_type=err_label, escalate=True
             )
             return ClassifiedIntent(
                 intent="ambiguous",
                 domain=IntentDomain.AMBIGUOUS,
                 confidence=0.0,
                 resolved_message=envelope.redacted_message,
+                reasoning=f"error:{err_label}:{err_detail}"[:500],
                 escalate=True,
                 path=ClassifierPath.DEEP,
             )

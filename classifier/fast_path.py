@@ -297,6 +297,22 @@ _EXEMPLARS: dict[IntentDomain, list[str]] = {
         "wah this concept very cheem, can explain simpler?",
         "explain how NS deferment works",
         "what is the difference between GST and income tax?",
+        # Product / brand questions
+        "what is BMW?",
+        "tell me about the BMW 3 Series",
+        "what is the BMW e30?",
+        "what is the BMW e46?",
+        "what car models does BMW make?",
+        "tell me about Tesla electric cars",
+        "what is the iPhone 15?",
+        "what are the specs of the MacBook Pro?",
+        "tell me about the Samsung Galaxy S series",
+        "what is a Toyota Camry?",
+        "what is a Volkswagen Golf?",
+        "tell me about Airbus A380",
+        "what is the PlayStation 5?",
+        "what are the features of the latest iPad?",
+        "what is the Dyson vacuum cleaner known for?",
     ],
 
     # ------------------------------------------------------------------
@@ -642,7 +658,7 @@ class EmbeddingFastPath:
             return None
 
         try:
-            query_vectors = await self._embed([message], input_type="search_query")
+            query_vectors = await self._embed([message], input_type="classification")
         except BedrockError as exc:
             safe_log.warning("classifier.fast_path.embed_error", error_type=type(exc).__name__)
             return None
@@ -679,7 +695,12 @@ class EmbeddingFastPath:
         )
 
     async def _embed(self, texts: list[str], input_type: str) -> list[list[float]]:
-        body: dict[str, Any] = {"texts": texts, "input_type": input_type}
-        response = await self._bedrock.invoke_model(self._config.cohere_model_id, body)
-        embeddings: list[list[float]] = response["embeddings"]
-        return embeddings
+        # Cohere Bedrock enforces a 96-text-per-request limit; chunk to stay safe.
+        _BATCH = 90
+        all_embeddings: list[list[float]] = []
+        for i in range(0, len(texts), _BATCH):
+            batch = texts[i : i + _BATCH]
+            body: dict[str, Any] = {"texts": batch, "input_type": input_type}
+            response = await self._bedrock.invoke_model(self._config.cohere_model_id, body)
+            all_embeddings.extend(response["embeddings"])
+        return all_embeddings

@@ -70,6 +70,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     redis_client = aioredis.from_url(cfg.redis_url)
     bouncer = Bouncer(BouncerConfig(), redis_client, bedrock)
     classifier = Classifier(ClassifierConfig(), bedrock)
+    await classifier.initialize()
     strategist = Strategist(StrategistConfig(), bedrock)
 
     envelope = PipelineEnvelope(

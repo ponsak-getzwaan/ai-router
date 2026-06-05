@@ -47,6 +47,7 @@ class IntentDomain(StrEnum):
     SIMPLE_TRANSACTIONAL = "simple_transactional"
     OUT_OF_SCOPE = "out_of_scope"
     AMBIGUOUS = "ambiguous"
+    HARMFUL = "harmful"
 
 
 class ClassifierPath(StrEnum):

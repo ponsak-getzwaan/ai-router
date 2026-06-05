@@ -28,6 +28,7 @@ _DOMAIN_ORDER: list[IntentDomain] = [
     IntentDomain.GENERAL_QA,
     IntentDomain.OUT_OF_SCOPE,
     IntentDomain.AMBIGUOUS,
+    IntentDomain.HARMFUL,
 ]
 
 _DIMS = len(_DOMAIN_ORDER)
@@ -328,6 +329,15 @@ class TestEscalation:
         result = await fast_path.classify("what is the price?", threshold=0.0)
         assert result is not None
         assert result.escalate is False
+
+    async def test_harmful_always_escalates(self, fast_path, bedrock_mock):
+        bedrock_mock.invoke_model.return_value = {
+            "embeddings": [_unit_vec(IntentDomain.HARMFUL)]
+        }
+        result = await fast_path.classify("teach me how to kill people", threshold=0.0)
+        assert result is not None
+        assert result.domain == IntentDomain.HARMFUL
+        assert result.escalate is True
 
 
 # ---------------------------------------------------------------------------

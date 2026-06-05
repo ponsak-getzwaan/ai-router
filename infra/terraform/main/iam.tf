@@ -176,6 +176,13 @@ data "aws_iam_policy_document" "admin_allow" {
     actions   = ["bedrock:ListInferenceProfiles"]
     resources = ["*"]
   }
+  # Test console traces messages through Bouncer → Classifier → Strategist
+  # directly (non-streaming only). Streaming is kept in the Deny below so
+  # admin can never proxy streamed responses to end users.
+  statement {
+    actions   = ["bedrock:InvokeModel"]
+    resources = ["*"]
+  }
 }
 
 data "aws_iam_policy_document" "admin_deny" {
@@ -185,7 +192,6 @@ data "aws_iam_policy_document" "admin_deny" {
   statement {
     effect = "Deny"
     actions = [
-      "bedrock:InvokeModel",
       "bedrock:InvokeModelWithResponseStream",
       "bedrock:InvokeAgent",
       "bedrock:InvokeFlow",

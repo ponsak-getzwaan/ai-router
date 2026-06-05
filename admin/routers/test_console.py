@@ -20,8 +20,6 @@ from fastapi import APIRouter, Request
 from admin.models import TestConsoleLayerResult, TestConsoleRequest, TestConsoleResponse
 from bouncer.bouncer import Bouncer
 from bouncer.config import BouncerConfig
-from classifier.classifier import Classifier
-from classifier.config import ClassifierConfig
 from shared.bedrock import BedrockRuntime
 from shared.logging import safe_log
 from shared.models import PipelineEnvelope
@@ -69,8 +67,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     bedrock = BedrockRuntime(region=cfg.aws_region)
     redis_client = aioredis.from_url(cfg.redis_url)
     bouncer = Bouncer(BouncerConfig(), redis_client, bedrock)
-    classifier = Classifier(ClassifierConfig(), bedrock)
-    await classifier.initialize()
+    classifier = request.app.state.classifier
     strategist = Strategist(StrategistConfig(), bedrock)
 
     envelope = PipelineEnvelope(

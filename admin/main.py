@@ -21,6 +21,9 @@ from admin.services.cloudwatch import CloudWatchService
 from admin.services.dynamo_admin import DynamoAdminService
 from admin.services.redis_admin import RedisAdminService
 from admin.services.sqs_admin import SQSAdminService
+from classifier.classifier import Classifier
+from classifier.config import ClassifierConfig
+from shared.bedrock import BedrockRuntime
 from shared.logging import configure, safe_log
 
 
@@ -46,6 +49,12 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         visibility_seconds=cfg.sqs_escalation_visibility_seconds,
     )
     application.state.redis = redis
+
+    bedrock = BedrockRuntime(region=cfg.aws_region)
+    classifier = Classifier(ClassifierConfig(), bedrock)
+    await classifier.initialize()
+    application.state.bedrock = bedrock
+    application.state.classifier = classifier
 
     safe_log.info("admin.started", service_name="admin")
     yield

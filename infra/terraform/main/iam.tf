@@ -157,7 +157,7 @@ data "aws_iam_policy_document" "admin_allow" {
     ]
   }
   statement {
-    actions   = ["sqs:GetQueueAttributes", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
+    actions   = ["sqs:GetQueueAttributes", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:SendMessage"]
     resources = [aws_sqs_queue.escalation.arn]
   }
   # Test console submits messages through the real pipeline for accurate metrics

@@ -10,11 +10,13 @@ admin IAM denies bedrock:InvokeModelWithResponseStream) and return the response.
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import aioboto3  # type: ignore[import-untyped]
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Request
 
@@ -28,6 +30,37 @@ from strategist.config import StrategistConfig
 from strategist.strategist import Strategist
 
 router = APIRouter(prefix="/admin", tags=["test-console"])
+
+_sqs_session: aioboto3.Session = aioboto3.Session()
+
+
+async def _enqueue_escalation(
+    cfg: Any,
+    envelope: PipelineEnvelope,
+    correlation_id: str,
+    bouncer_reason: str | None,
+) -> None:
+    """Send escalated message to the SQS escalation queue (best-effort, never raises)."""
+    if not cfg.sqs_escalation_url:
+        return
+    try:
+        msg = {
+            "correlation_id": correlation_id,
+            "user_sub": envelope.user_sub,
+            "session_id": envelope.session_id,
+            "redacted_message": envelope.redacted_message,
+            "entity_types": [t.value for t in envelope.entity_types_redacted],
+            "bouncer_reason": bouncer_reason,
+            "source": "test_console",
+        }
+        async with _sqs_session.client("sqs", region_name=cfg.aws_region) as sqs:
+            await sqs.send_message(
+                QueueUrl=cfg.sqs_escalation_url,
+                MessageBody=json.dumps(msg),
+            )
+        safe_log.info("admin.test_console.escalation_queued", correlation_id=correlation_id)
+    except Exception as exc:
+        safe_log.warning("admin.test_console.escalation_queue_error", error_type=type(exc).__name__)
 
 
 def _layer(name: str, start: float, outcome: dict[str, Any]) -> TestConsoleLayerResult:
@@ -102,6 +135,8 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
             "timed_out": bounce.timed_out,
         }))
         if not bounce.allowed or bounce.escalate:
+            if bounce.escalate:
+                await _enqueue_escalation(cfg, envelope, correlation_id, bounce.reason)
             return _response(correlation_id, body.dry_run, layers, None, total_start)
     except Exception as exc:
         layers.append(_layer("bouncer", t0, {"error_type": type(exc).__name__}))
@@ -119,6 +154,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
             "path": str(intent.path),
         }))
         if intent.escalate:
+            await _enqueue_escalation(cfg, envelope, correlation_id, bouncer_reason=None)
             return _response(correlation_id, body.dry_run, layers, None, total_start)
     except Exception as exc:
         layers.append(_layer("classifier", t0, {"error_type": type(exc).__name__}))

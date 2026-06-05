@@ -73,14 +73,14 @@ class TestPutRoutingRule:
     async def test_returns_200(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.put(
             "/admin/routing-rules/general_qa",
-            json={"vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"},
+            json={"vendor": "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"},
         )
         assert resp.status_code == 200
 
     async def test_calls_dynamo_put_with_intent_and_body(self, ctx: AdminCtx) -> None:
         await ctx.client.put(
             "/admin/routing-rules/general_qa",
-            json={"vendor": "apac.anthropic.claude-haiku-4-5-20241022-v1:0"},
+            json={"vendor": "apac.anthropic.claude-3-haiku-20240307-v1:0"},
         )
         ctx.dynamo.put_routing_rule.assert_called_once()
         call_args = ctx.dynamo.put_routing_rule.call_args
@@ -90,18 +90,18 @@ class TestPutRoutingRule:
         ctx.dynamo.put_routing_rule = AsyncMock(
             return_value=RoutingRule(
                 intent="general_qa",
-                vendor="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+                vendor="apac.anthropic.claude-3-haiku-20240307-v1:0",
                 fallback=None,
                 description=None,
             )
         )
         resp = await ctx.client.put(
             "/admin/routing-rules/general_qa",
-            json={"vendor": "apac.anthropic.claude-haiku-4-5-20241022-v1:0"},
+            json={"vendor": "apac.anthropic.claude-3-haiku-20240307-v1:0"},
         )
         data = resp.json()
         assert data["intent"] == "general_qa"
-        assert data["vendor"] == "apac.anthropic.claude-haiku-4-5-20241022-v1:0"
+        assert data["vendor"] == "apac.anthropic.claude-3-haiku-20240307-v1:0"
 
     async def test_empty_vendor_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.put(
@@ -121,7 +121,7 @@ class TestPutRoutingRule:
         resp = await ctx.client.put(
             "/admin/routing-rules/general_qa",
             json={
-                "vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+                "vendor": "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "unknown_field": "bad",
             },
         )
@@ -131,8 +131,8 @@ class TestPutRoutingRule:
         resp = await ctx.client.put(
             "/admin/routing-rules/general_qa",
             json={
-                "vendor": "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
-                "fallback": "apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+                "vendor": "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                "fallback": "apac.anthropic.claude-3-haiku-20240307-v1:0",
                 "description": "Handles general questions",
             },
         )

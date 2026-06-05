@@ -104,8 +104,8 @@ def make_strategist_metrics(period: int = 60) -> StrategistMetrics:
 def make_routing_rule(intent: str = "general_qa") -> RoutingRule:
     return RoutingRule(
         intent=intent,
-        vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
-        fallback="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+        vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        fallback="apac.anthropic.claude-3-haiku-20240307-v1:0",
         description="General questions",
     )
 
@@ -123,7 +123,7 @@ def make_audit_record(cid: str = "test-cid-001") -> AuditRecord:
         bouncer_escalated=False,
         intent="general_qa",
         intent_confidence="0.92",
-        vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         routing_path="deterministic",
         policy_blocked=False,
         total_latency_ms="342.5",

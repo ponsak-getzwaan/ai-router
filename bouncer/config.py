@@ -31,7 +31,7 @@ class BouncerConfig(BaseSettings):
     # Haiku LLM micro-classifier
     # -------------------------------------------------------------------------
     haiku_model_id: str = Field(
-        default="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+        default="apac.anthropic.claude-3-haiku-20240307-v1:0",
         description=(
             "Bedrock cross-region inference profile ID. "
             "Verify the exact ID in the Bedrock console before pinning. "

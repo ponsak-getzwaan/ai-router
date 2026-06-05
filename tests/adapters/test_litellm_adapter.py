@@ -49,7 +49,7 @@ def make_envelope(
 
 
 def make_plan(
-    primary_vendor: str = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+    primary_vendor: str = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
     fallback: tuple[str, ...] = (),
     streaming: bool = False,
     timeout: float = 5.0,
@@ -101,7 +101,7 @@ def test_litellm_model_prefixes_bedrock() -> None:
 
 
 def test_litellm_model_full_profile_id() -> None:
-    pid = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+    pid = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
     assert _litellm_model(pid) == f"bedrock/{pid}"
 
 

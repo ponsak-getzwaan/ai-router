@@ -113,7 +113,7 @@ def make_intent_result(escalate: bool = False, intent: str = "general_qa") -> Cl
 
 def make_routing_plan(blocked: bool = False) -> RoutingPlan:
     return RoutingPlan(
-        primary_vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        primary_vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         context=RoutingContext(
             bedrock_region=REGION,
             timeout_seconds=30.0,

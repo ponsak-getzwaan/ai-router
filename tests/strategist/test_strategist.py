@@ -28,8 +28,8 @@ from strategist.strategist import Strategist
 # Vendor IDs
 # ---------------------------------------------------------------------------
 
-_HAIKU = "apac.anthropic.claude-haiku-4-5-20241022-v1:0"
-_SONNET = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+_HAIKU = "apac.anthropic.claude-3-haiku-20240307-v1:0"
+_SONNET = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
 # ---------------------------------------------------------------------------

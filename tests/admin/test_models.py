@@ -42,7 +42,7 @@ class TestAuditRecordSchema:
             bouncer_escalated=False,
             intent="general_qa",
             intent_confidence="0.92",
-            vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+            vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
             routing_path="deterministic",
             policy_blocked=False,
             total_latency_ms="342.5",
@@ -146,25 +146,25 @@ class TestRoutingRuleUpdateSchema:
             RoutingRuleUpdate(vendor="x" * 201)
 
     def test_valid_vendor_accepted(self) -> None:
-        rule = RoutingRuleUpdate(vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0")
-        assert rule.vendor == "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+        rule = RoutingRuleUpdate(vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
+        assert rule.vendor == "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
     def test_fallback_and_description_optional(self) -> None:
-        rule = RoutingRuleUpdate(vendor="apac.anthropic.claude-haiku-4-5-20241022-v1:0")
+        rule = RoutingRuleUpdate(vendor="apac.anthropic.claude-3-haiku-20240307-v1:0")
         assert rule.fallback is None
         assert rule.description is None
 
     def test_description_too_long_rejected(self) -> None:
         with pytest.raises(ValidationError):
             RoutingRuleUpdate(
-                vendor="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+                vendor="apac.anthropic.claude-3-haiku-20240307-v1:0",
                 description="x" * 501,
             )
 
     def test_extra_fields_rejected(self) -> None:
         with pytest.raises(ValidationError):
             RoutingRuleUpdate(  # type: ignore[call-arg]
-                vendor="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
+                vendor="apac.anthropic.claude-3-haiku-20240307-v1:0",
                 unknown="bad",
             )
 

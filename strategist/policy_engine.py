@@ -21,7 +21,7 @@ _BLOCKED_INTENTS: frozenset[str] = frozenset(
 _APAC_PREFIX = "apac."
 
 # Fallback for non-resident vendors — always an APAC Sonnet inference profile.
-_SG_FALLBACK_VENDOR = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+_SG_FALLBACK_VENDOR = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
 def apply_policies(

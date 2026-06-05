@@ -44,7 +44,7 @@ def _make_intent_result(
 
 def _make_routing_plan() -> MagicMock:
     plan = MagicMock()
-    plan.primary_vendor = "apac.anthropic.claude-sonnet-4-6-20241022-v2:0"
+    plan.primary_vendor = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
     plan.path = "deterministic"
     plan.blocked = False
     plan.policy_modified = False

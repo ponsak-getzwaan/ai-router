@@ -85,7 +85,7 @@ def make_intent(escalate: bool = False) -> ClassifiedIntent:
 
 def make_plan(blocked: bool = False) -> RoutingPlan:
     return RoutingPlan(
-        primary_vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        primary_vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         fallback_chain=(),
         context=RoutingContext(timeout_seconds=10.0, max_retries=2, streaming=False),
         path=StrategistPath.DETERMINISTIC,

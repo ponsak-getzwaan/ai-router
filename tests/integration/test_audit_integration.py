@@ -73,7 +73,7 @@ def _make_intent() -> ClassifiedIntent:
 
 def _make_plan() -> RoutingPlan:
     return RoutingPlan(
-        primary_vendor="apac.anthropic.claude-sonnet-4-6-20241022-v2:0",
+        primary_vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         context=RoutingContext(
             bedrock_region="ap-southeast-1",
             timeout_seconds=30.0,

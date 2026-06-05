@@ -22,7 +22,6 @@ from adapters.litellm_adapter import invoke as litellm_invoke
 from admin.models import TestConsoleLayerResult, TestConsoleRequest, TestConsoleResponse
 from bouncer.bouncer import Bouncer
 from bouncer.config import BouncerConfig
-from shared.bedrock import BedrockRuntime
 from shared.logging import safe_log
 from shared.models import PipelineEnvelope
 from strategist.config import StrategistConfig
@@ -67,8 +66,9 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     layers: list[TestConsoleLayerResult] = []
     cfg = request.app.state.config
 
-    # Build pipeline components (patched in tests via module-level names)
-    bedrock = BedrockRuntime(region=cfg.aws_region)
+    # Reuse the startup BedrockRuntime — shares the HTTP connection pool across
+    # requests so the bouncer Haiku call gets a warm connection, not a cold TLS start.
+    bedrock = request.app.state.bedrock
     redis_client = aioredis.from_url(cfg.redis_url)
     bouncer = Bouncer(BouncerConfig(), redis_client, bedrock)
     classifier = request.app.state.classifier

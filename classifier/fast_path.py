@@ -109,6 +109,25 @@ _FOLLOWUP_PREFIXES: tuple[str, ...] = (
     "sure,",
     "actually,",
     "wait,",
+    # Comparative / pronoun-reference follow-ups — these phrases almost always
+    # refer back to a prior turn. Without history context the fast path would
+    # match them against the AMBIGUOUS exemplar cluster and escalate incorrectly.
+    "what makes",
+    "what made",
+    "how does it",
+    "how did it",
+    "why does it",
+    "why did it",
+    "why is it",
+    "is it ",
+    "how is it",
+    "which is",
+    "how about",
+    "compared to",
+    "different from",
+    "similar to",
+    "better than",
+    "worse than",
 )
 _FOLLOWUP_MAX_CHARS: int = 15
 

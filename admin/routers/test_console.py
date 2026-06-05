@@ -24,6 +24,7 @@ from adapters.litellm_adapter import invoke as litellm_invoke
 from admin.models import TestConsoleLayerResult, TestConsoleRequest, TestConsoleResponse
 from bouncer.bouncer import Bouncer
 from bouncer.config import BouncerConfig
+from orchestrator.history import SessionHistory
 from shared.logging import safe_log
 from shared.models import PipelineEnvelope
 from strategist.config import StrategistConfig
@@ -104,6 +105,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     bedrock = request.app.state.bedrock
     redis_client = aioredis.from_url(cfg.redis_url)
     bouncer = Bouncer(BouncerConfig(), redis_client, bedrock)
+    session_history = SessionHistory(redis_client)
     classifier = request.app.state.classifier
     strategist = Strategist(StrategistConfig(), bedrock)
 
@@ -144,9 +146,10 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
                          error=type(exc).__name__)
 
     # ── Classifier ─────────────────────────────────────────────────────────
+    history = await session_history.get(body.session_id)
     t0 = time.monotonic()
     try:
-        intent = await classifier.classify(envelope)
+        intent = await classifier.classify(envelope, history=history)
         layers.append(_layer("classifier", t0, {
             "intent": intent.intent,
             "confidence": intent.confidence,
@@ -188,6 +191,8 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         try:
             vendor_response = await litellm_invoke(envelope, non_streaming_plan)
             layers.append(_layer("adapter", t0, {"vendor": final_vendor}))
+            if vendor_response:
+                await session_history.append(body.session_id, body.redacted_message, vendor_response)
         except Exception as exc:
             layers.append(_layer("adapter", t0, {"error_type": type(exc).__name__}))
 

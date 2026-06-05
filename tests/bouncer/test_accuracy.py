@@ -195,7 +195,7 @@ ACCURACY_SAMPLES: list[tuple[str, str, str]] = [
 # samples stay short, and high rate limit so tests don't interfere.
 _TEST_CONFIG = BouncerConfig(
     total_budget_ms=5000.0,
-    haiku_model_id="apac.anthropic.claude-3-haiku-20240307-v1:0",
+    haiku_model_id="apac.anthropic.claude-haiku-4-5-20241022-v1:0",
     haiku_max_tokens=50,
     confidence_threshold=0.7,
     max_message_length=200,

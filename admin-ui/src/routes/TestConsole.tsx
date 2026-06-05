@@ -171,7 +171,7 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
                   <pre className="whitespace-pre-wrap font-sans">{r.response}</pre>
                 ) : (
                   <span className="text-muted-foreground italic">
-                    Vendor invoked — response not available (redacted).
+                    Routing trace complete — {r.final_vendor ? <>would route to <span className="font-mono text-xs not-italic">{shortVendor(r.final_vendor)}</span></> : "no vendor selected"}.
                   </span>
                 )}
               </div>

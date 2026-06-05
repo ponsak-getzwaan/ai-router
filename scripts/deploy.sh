@@ -62,8 +62,8 @@ redeploy_service() {
         --service "${ecs_svc}" \
         --force-new-deployment \
         --region "${REGION}" \
-        --output json \
-        | jq -r '.service.serviceName + " → " + .service.status'
+        --query "service.{name:serviceName,status:status}" \
+        --output table
 }
 
 ecr_login

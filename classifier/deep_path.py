@@ -24,12 +24,16 @@ IMPORTANT: Messages may contain tokens like VAULT_XXXXXXXXXX. These are redacted
 values (e.g. NRIC, credit card numbers, passport numbers). Treat them as stand-ins for \
 sensitive personal data and classify the message based on the surrounding context and intent.
 
-Classify the user message into one of these intents:
-- general_qa: general questions, explanations, summaries
+When the conversation includes prior turns, use them to resolve pronouns and references \
+(e.g. "it", "this", "that", "they") in the CURRENT user message before classifying. \
+Classify only the intent of the LAST user message — not the conversation as a whole.
+
+Classify the current user message into one of these intents:
+- general_qa: general questions, explanations, summaries, comparisons
 - code_assistance: coding, debugging, programming help
 - simple_transactional: quick lookups, prices, hours, contacts
 - out_of_scope: requests the system cannot handle
-- ambiguous: unclear intent requiring clarification
+- ambiguous: unclear intent even after considering prior context
 
 Reply with JSON only:
 {

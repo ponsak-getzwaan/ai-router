@@ -10,7 +10,7 @@ class ClassifierConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CLASSIFIER_")
 
     # Fast path — embedding similarity
-    fast_path_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    fast_path_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
     cohere_model_id: str = Field(default="cohere.embed-multilingual-v3")
 
     # Deep path — Sonnet

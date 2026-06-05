@@ -300,7 +300,7 @@ export function TestConsole() {
       const raw = await apiFetch<unknown>("/admin/test-console", {
         method: "POST",
         body: JSON.stringify({
-          message: userMessage,
+          redacted_message: userMessage,
           user_sub: values.user_sub.trim() || "admin-test-user",
           session_id: values.session_id.trim() || "admin-test-session",
         }),

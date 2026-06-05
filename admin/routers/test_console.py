@@ -2,8 +2,9 @@
 
 Runs Bouncer → Classifier → Strategist directly (no SQS, no vault, no Presidio).
 Input must already be redacted; this endpoint traces routing decisions only.
-dry_run=True (default): vendor adapter layer is omitted.
-dry_run=False: an adapter layer is recorded as skipped.
+dry_run=True: stop after Strategist, return routing trace only.
+dry_run=False (default): also invoke the vendor adapter (non-streaming only —
+admin IAM denies bedrock:InvokeModelWithResponseStream) and return the response.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Request
 
+from adapters.litellm_adapter import invoke as litellm_invoke
 from admin.models import TestConsoleLayerResult, TestConsoleRequest, TestConsoleResponse
 from bouncer.bouncer import Bouncer
 from bouncer.config import BouncerConfig
@@ -44,6 +46,7 @@ def _response(
     final_vendor: str | None,
     total_start: float,
     error: str | None = None,
+    response: str | None = None,
 ) -> TestConsoleResponse:
     return TestConsoleResponse(
         correlation_id=correlation_id,
@@ -53,6 +56,7 @@ def _response(
         total_latency_ms=round((time.monotonic() - total_start) * 1000, 1),
         timed_out=False,
         error=error,
+        response=response,
     )
 
 
@@ -138,13 +142,19 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         return _response(correlation_id, body.dry_run, layers, None, total_start,
                          error=type(exc).__name__)
 
-    # ── Adapter (always skipped in test console) ───────────────────────────
-    if not body.dry_run:
-        layers.append(TestConsoleLayerResult(
-            layer="adapter",
-            latency_ms=0.0,
-            outcome={"skipped": True},
-        ))
+    # ── Adapter ────────────────────────────────────────────────────────────
+    vendor_response: str | None = None
+    if not body.dry_run and final_vendor:
+        # Admin IAM denies bedrock:InvokeModelWithResponseStream — force non-streaming.
+        non_streaming_context = plan.context.model_copy(update={"streaming": False})
+        non_streaming_plan = plan.model_copy(update={"context": non_streaming_context})
+        t0 = time.monotonic()
+        try:
+            vendor_response = await litellm_invoke(envelope, non_streaming_plan)
+            layers.append(_layer("adapter", t0, {"vendor": final_vendor}))
+        except Exception as exc:
+            layers.append(_layer("adapter", t0, {"error_type": type(exc).__name__}))
 
     safe_log.info("admin.test_console.completed", correlation_id=correlation_id)
-    return _response(correlation_id, body.dry_run, layers, final_vendor, total_start)
+    return _response(correlation_id, body.dry_run, layers, final_vendor, total_start,
+                     response=vendor_response)

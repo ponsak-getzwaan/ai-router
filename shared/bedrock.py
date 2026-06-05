@@ -10,6 +10,7 @@ Raw model IDs fail with "on-demand throughput not supported" in ap-southeast-1.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -17,6 +18,11 @@ import aioboto3  # type: ignore[import-untyped]
 import botocore.exceptions
 
 from shared.errors import BedrockError, BedrockTimeout
+
+# Transient Bedrock error codes that are safe to retry.
+_RETRYABLE_CODES: frozenset[str] = frozenset({"ThrottlingException", "ServiceUnavailableException"})
+_MAX_RETRIES: int = 3
+_RETRY_BASE_SECONDS: float = 0.5  # 0.5 s, 1 s, 2 s
 
 BEDROCK_REGION: str = "ap-southeast-1"
 
@@ -60,38 +66,59 @@ class BedrockRuntime:
 
         Raises:
             BedrockTimeout: on read or connect timeout.
-            BedrockError: on any other Bedrock or network error.
+            BedrockError: on any other Bedrock or network error (after retries).
+
+        ThrottlingException and ServiceUnavailableException are retried up to
+        _MAX_RETRIES times with exponential backoff (_RETRY_BASE_SECONDS * 2^attempt).
+        The Bouncer's asyncio.wait_for(timeout=0.2) naturally cancels retry sleeps
+        if the budget is exceeded, preserving fail-open behaviour.
         """
         invoke_region = _region_for_model(model_id, default=self._region)
-        try:
-            async with self._session.client(
-                "bedrock-runtime", region_name=invoke_region
-            ) as client:
-                raw_response = await client.invoke_model(
-                    modelId=model_id,
-                    body=json.dumps(body),
-                    contentType="application/json",
-                    accept="application/json",
+        last_exc: Exception | None = None
+
+        for attempt in range(_MAX_RETRIES + 1):
+            if attempt:
+                await asyncio.sleep(_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
+            try:
+                async with self._session.client(
+                    "bedrock-runtime", region_name=invoke_region
+                ) as client:
+                    raw_response = await client.invoke_model(
+                        modelId=model_id,
+                        body=json.dumps(body),
+                        contentType="application/json",
+                        accept="application/json",
+                    )
+                    raw_body: bytes = await raw_response["body"].read()
+                    result: dict[str, Any] = json.loads(raw_body)
+                    return result
+            except (
+                botocore.exceptions.ReadTimeoutError,
+                botocore.exceptions.ConnectTimeoutError,
+            ) as exc:
+                raise BedrockTimeout(type(exc).__name__) from exc
+            except (
+                botocore.exceptions.ClientError,
+                botocore.exceptions.BotoCoreError,
+            ) as exc:
+                from shared.logging import safe_log as _log
+                _resp = getattr(exc, "response", None) or {}
+                _code = _resp.get("Error", {}).get("Code", type(exc).__name__)
+                _log.warning(
+                    "bedrock.client_error",
+                    error_type=type(exc).__name__,
+                    error_code=_code,
+                    model_id=model_id,
+                    attempt=attempt,
                 )
-                raw_body: bytes = await raw_response["body"].read()
-                result: dict[str, Any] = json.loads(raw_body)
-                return result
-        except (
-            botocore.exceptions.ReadTimeoutError,
-            botocore.exceptions.ConnectTimeoutError,
-        ) as exc:
-            raise BedrockTimeout(type(exc).__name__) from exc
-        except (
-            botocore.exceptions.ClientError,
-            botocore.exceptions.BotoCoreError,
-        ) as exc:
-            from shared.logging import safe_log as _log
-            _resp = getattr(exc, "response", None) or {}
-            _code = _resp.get("Error", {}).get("Code", type(exc).__name__)
-            _log.warning("bedrock.client_error", error_type=type(exc).__name__, error_code=_code, model_id=model_id)
-            raise BedrockError(type(exc).__name__) from exc
-        except Exception as exc:
-            raise BedrockError(type(exc).__name__) from exc
+                if _code in _RETRYABLE_CODES and attempt < _MAX_RETRIES:
+                    last_exc = exc
+                    continue
+                raise BedrockError(type(exc).__name__) from exc
+            except Exception as exc:
+                raise BedrockError(type(exc).__name__) from exc
+
+        raise BedrockError(type(last_exc).__name__ if last_exc else "ThrottlingException") from last_exc
 
 
 _default_runtime: BedrockRuntime | None = None

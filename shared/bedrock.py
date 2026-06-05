@@ -21,8 +21,8 @@ from shared.errors import BedrockError, BedrockTimeout
 
 # Transient Bedrock error codes that are safe to retry.
 _RETRYABLE_CODES: frozenset[str] = frozenset({"ThrottlingException", "ServiceUnavailableException"})
-_MAX_RETRIES: int = 3
-_RETRY_BASE_SECONDS: float = 0.5  # 0.5 s, 1 s, 2 s
+_MAX_RETRIES: int = 1
+_RETRY_BASE_SECONDS: float = 0.5  # one retry after 0.5 s
 
 BEDROCK_REGION: str = "ap-southeast-1"
 

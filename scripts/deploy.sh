@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REGION="ap-southeast-1"
-ACCOUNT_ID="026651348796"
+ACCOUNT_ID="859287180127"
 CLUSTER="ai-router"
 ECR_BASE="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 

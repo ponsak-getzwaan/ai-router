@@ -30,11 +30,16 @@ When the conversation includes prior turns, use them to resolve pronouns and ref
 Classify only the intent of the LAST user message — not the conversation as a whole.
 
 Classify the current user message into one of these intents:
-- general_qa: general questions, explanations, summaries, comparisons
+- general_qa: questions, explanations, summaries, comparisons, troubleshooting, \
+how-to guidance, problem diagnosis, advice — anything the AI can answer directly
 - code_assistance: coding, debugging, programming help
 - simple_transactional: quick lookups, prices, hours, contacts
-- out_of_scope: requests the system cannot handle
-- ambiguous: unclear intent even after considering prior context
+- out_of_scope: requests the system fundamentally cannot handle (e.g. booking, \
+purchasing, contacting a human agent)
+- ambiguous: intent cannot be determined even after considering all available context
+
+When the message describes a problem or complaint (e.g. "X is not working"), treat \
+it as general_qa — the user wants help or advice, not a human agent.
 
 Reply with JSON only:
 {
@@ -44,7 +49,7 @@ Reply with JSON only:
   "reasoning": "<one sentence, no user content>",
   "escalate": true|false
 }
-Set escalate=true if confidence < 0.6 or intent is out_of_scope/ambiguous."""
+Set escalate=true only if intent is out_of_scope or ambiguous, or if confidence < 0.6."""
 
 _DOMAIN_MAP: dict[str, IntentDomain] = {
     "general_qa": IntentDomain.GENERAL_QA,

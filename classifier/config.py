@@ -14,7 +14,7 @@ class ClassifierConfig(BaseSettings):
     cohere_model_id: str = Field(default="cohere.embed-multilingual-v3")
 
     # Deep path — Sonnet
-    sonnet_model_id: str = Field(default="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
+    sonnet_model_id: str = Field(default="apac.anthropic.claude-sonnet-4-20250514-v1:0")
     sonnet_max_tokens: int = Field(default=300)
 
     # Escalation threshold

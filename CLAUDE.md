@@ -160,9 +160,9 @@ These checks run on every PR. Don't bypass them.
 - Region: `ap-southeast-1` (Singapore). Hard-coded in IAM policy conditions and in the Bedrock client factory in `shared/bedrock.py`.
 - Model IDs (use cross-region inference profiles):
   - Haiku: `apac.anthropic.claude-3-haiku-20240307-v1:0` — for the Bouncer micro-classifier and Strategist arbitration.
-  - Sonnet: `apac.anthropic.claude-3-5-sonnet-20241022-v2:0` — for deep-path intent classification.
-  - Verified active in ap-southeast-1 on 2026-06-05. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a PR.
-  - **TRAP**: Claude 4 model IDs (`claude-haiku-4-5-*`, `claude-sonnet-4-6-*`) are NOT available as APAC inference profiles. Using them causes every Bedrock call to fail silently and the classifier returns `ambiguous` for all messages. Always verify with `aws bedrock list-inference-profiles --region ap-southeast-1 --query "inferenceProfileSummaries[?contains(inferenceProfileId,'apac')]"` before changing any model ID.
+  - Sonnet: `apac.anthropic.claude-sonnet-4-20250514-v1:0` — for deep-path intent classification and default vendor routing. Upgraded from 3.5 Sonnet V2 (2 RPM vs 1 RPM).
+  - Verified active in ap-southeast-1 on 2026-06-07. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a PR.
+  - **TRAP**: Claude Sonnet 4.5 and 4.6 model IDs are NOT available as APAC inference profiles. Neither are Llama models. Only `apac.*` prefixed IDs work — verify with `aws bedrock list-inference-profiles --region ap-southeast-1 --query "inferenceProfileSummaries[?contains(inferenceProfileId,'apac')]"` before changing any model ID.
 - First-time use: each AWS account hitting Anthropic models needs the FTU form submitted once. Console clicks, not Terraform.
 - `bedrock-runtime` invocation logging is **disabled**. Application-level logging via `safe_log` is the audit trail.
 

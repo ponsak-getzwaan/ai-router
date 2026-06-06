@@ -221,7 +221,8 @@
       "Bash(aws iam *)",
       "Bash(echo \"Exit: $?\")",
       "Bash(aws elasticache describe-cache-clusters *)",
-      "Bash(aws ec2 *)"
+      "Bash(aws ec2 *)",
+      "Bash(aws service-quotas *)"
     ]
   }
 }

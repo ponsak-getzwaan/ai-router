@@ -18,7 +18,7 @@ class StrategistConfig(BaseSettings):
     haiku_max_tokens: int = Field(default=80)
 
     # Default vendor when no rule matches
-    default_vendor: str = Field(default="apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
+    default_vendor: str = Field(default="apac.anthropic.claude-sonnet-4-20250514-v1:0")
 
     # Timeouts (seconds) used in the RoutingContext
     haiku_timeout_s: float = Field(default=15.0)

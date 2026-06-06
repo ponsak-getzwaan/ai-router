@@ -70,13 +70,31 @@ class DeepPathClassifier:
         On Bedrock error, returns an ambiguous/escalate result (fail-safe,
         not fail-open — unlike the Bouncer, the classifier CAN escalate).
         """
-        # Prepend up to the last 4 turns (2 exchanges) for follow-up context.
-        prior: list[dict[str, Any]] = list(history[-4:]) if history else []
+        # Embed history as inline context in the user message rather than as alternating
+        # API turns. When prior assistant turns contain long vendor responses, Sonnet 4.6
+        # matches that conversational pattern and responds in prose instead of JSON.
+        if history:
+            prior_turns = history[-4:]
+            context_lines: list[str] = []
+            for turn in prior_turns:
+                role = "User" if turn["role"] == "user" else "Assistant"
+                # Truncate long assistant responses — we only need enough for pronoun resolution.
+                content = turn["content"][:300] if turn["role"] == "assistant" else turn["content"]
+                context_lines.append(f"{role}: {content}")
+            context_block = "\n".join(context_lines)
+            user_content = (
+                f"[Prior conversation — for pronoun resolution only]\n"
+                f"{context_block}\n\n"
+                f"[Message to classify]\n{envelope.redacted_message}"
+            )
+        else:
+            user_content = envelope.redacted_message
+
         body: dict[str, Any] = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": self._config.sonnet_max_tokens,
             "system": _SYSTEM_PROMPT,
-            "messages": prior + [{"role": "user", "content": envelope.redacted_message}],
+            "messages": [{"role": "user", "content": user_content}],
         }
 
         try:

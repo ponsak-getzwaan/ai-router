@@ -24,9 +24,10 @@ litellm.drop_params = True  # ignore unknown params silently
 
 
 _PREFIX_TO_REGION: dict[str, str] = {
-    "apac.": "ap-southeast-1",
-    "us.":   "us-east-1",
-    "eu.":   "eu-west-1",
+    "apac.":   "ap-southeast-1",
+    "global.": "ap-southeast-1",
+    "us.":     "us-east-1",
+    "eu.":     "eu-west-1",
 }
 
 

@@ -191,7 +191,7 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
         non_streaming_plan = plan.model_copy(update={"context": non_streaming_context})
         t0 = time.monotonic()
         try:
-            vendor_response = await litellm_invoke(envelope, non_streaming_plan)
+            vendor_response = await litellm_invoke(envelope, non_streaming_plan, history=history or None)
             history_stored = False
             if vendor_response:
                 await session_history.append(body.session_id, body.redacted_message, vendor_response)

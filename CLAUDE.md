@@ -160,9 +160,9 @@ These checks run on every PR. Don't bypass them.
 - Region: `ap-southeast-1` (Singapore). Hard-coded in IAM policy conditions and in the Bedrock client factory in `shared/bedrock.py`.
 - Model IDs (use cross-region inference profiles):
   - Haiku: `apac.anthropic.claude-3-haiku-20240307-v1:0` — for the Bouncer micro-classifier and Strategist arbitration.
-  - Sonnet: `apac.anthropic.claude-3-5-sonnet-20241022-v2:0` — for deep-path intent classification and default vendor routing.
-  - Verified active in ap-southeast-1 on 2026-06-07. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a PR.
-  - **TRAP**: `apac.anthropic.claude-sonnet-4-20250514-v1:0` lists as an APAC profile but the underlying model has LEGACY status and returns ResourceNotFoundException — do not use. Claude Sonnet 4.5/4.6 and Llama have no APAC profiles at all. Always test a new model ID with a direct invoke before deploying.
+  - Sonnet: `global.anthropic.claude-sonnet-4-6` — for deep-path intent classification and default vendor routing. Global cross-region profile, invoked from ap-southeast-1, 10 RPM. Data-residency trade-off: compute may route outside ap-southeast-1 (accepted — no APAC profile exists for this model).
+  - Verified active in ap-southeast-1 on 2026-06-07. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a direct test invoke.
+  - **TRAP**: `apac.anthropic.claude-sonnet-4-20250514-v1:0` lists as an APAC profile but is LEGACY and returns ResourceNotFoundException — do not use. Claude Sonnet 4.5/4.6 Llama have no APAC profiles. Always test invoke before deploying any new model ID.
 - First-time use: each AWS account hitting Anthropic models needs the FTU form submitted once. Console clicks, not Terraform.
 - `bedrock-runtime` invocation logging is **disabled**. Application-level logging via `safe_log` is the audit trail.
 

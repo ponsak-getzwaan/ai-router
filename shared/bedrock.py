@@ -4,8 +4,10 @@ Non-negotiable: all LLM calls go through this module.
 No import anthropic, no import openai (CI enforced — see .github/workflows/ci.yml).
 Bedrock invocation logging is disabled by Terraform (CLAUDE.md §3.7).
 
-Models must use cross-region inference profile IDs (apac.* prefix), not raw model IDs.
-Raw model IDs fail with "on-demand throughput not supported" in ap-southeast-1.
+Models must use cross-region inference profile IDs (apac.* or global.* prefix), not
+raw model IDs. Raw model IDs fail with "on-demand throughput not supported".
+global.* profiles are invoked from ap-southeast-1 but may route compute globally
+(data-residency trade-off accepted per CLAUDE.md §3.9 note).
 """
 
 from __future__ import annotations
@@ -28,11 +30,13 @@ BEDROCK_REGION: str = "ap-southeast-1"
 
 # Maps inference profile ID prefix to the AWS region that serves it.
 # apac.* profiles are served from ap-southeast-1 (Singapore cluster).
+# global.* profiles are invoked from ap-southeast-1 but route compute globally.
 # us.* profiles are served from us-east-1.
 _PREFIX_TO_REGION: dict[str, str] = {
-    "apac.": "ap-southeast-1",
-    "us.":   "us-east-1",
-    "eu.":   "eu-west-1",
+    "apac.":   "ap-southeast-1",
+    "global.": "ap-southeast-1",
+    "us.":     "us-east-1",
+    "eu.":     "eu-west-1",
 }
 
 

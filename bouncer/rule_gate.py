@@ -34,6 +34,34 @@ _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bprompt\s+injection\b", re.IGNORECASE),
 )
 
+# Human targets used to anchor violence patterns — keeps "kill a process" / "kill
+# bacteria" / "kill time" out of scope while catching people-directed violence.
+_HUMAN_TARGET = (
+    r"(?:people|humans?|a\s+person|persons?|someone|"
+    r"a\s+(?:man|woman|child|girl|boy|cop)|"
+    r"children|kids?|civilians?|passengers?|customers?)"
+)
+
+# Patterns for content that is unambiguously harmful regardless of context.
+# Conservative by design — leave edge cases to Haiku. Only add a pattern when
+# there is no plausible legitimate use for the phrase in a customer-service AI.
+_HARMFUL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # Violence directed at people ("how to kill the people", "teach me to murder someone")
+    re.compile(
+        rf"\b(?:how\s+to|teach\s+me(?:\s+how)?\s+to|ways?\s+to|help\s+me(?:\s+to)?)\s+"
+        rf"(?:kill|murder|harm|hurt|rape|torture|assault)\s+(?:the\s+)?{_HUMAN_TARGET}\b",
+        re.IGNORECASE,
+    ),
+    # Weapons / explosives
+    re.compile(
+        r"\b(?:how\s+to\s+)?(?:make|build|create|synthesize|produce)\s+(?:a\s+)?"
+        r"(?:bomb|explosive|bioweapon|chemical\s+weapon|nerve\s+agent|poison\s+gas)\b",
+        re.IGNORECASE,
+    ),
+    # Child sexual abuse material
+    re.compile(r"\bchild\s*(?:porn(?:ography)?|sex(?:ual)?\s+abuse\s+material|csam)\b", re.IGNORECASE),
+)
+
 _BANNED_KEY_PREFIX = "banned:"
 _RATE_KEY_PREFIX = "ratelimit:"
 _RATE_WINDOW_SECONDS = 60
@@ -87,6 +115,25 @@ class RuleGate:
                 return BounceResult(
                     allowed=False,
                     reason="prompt_injection_detected",
+                    layer=BouncerLayer.RULE_GATE,
+                    confidence=1.0,
+                )
+
+        # 2b. Harmful content patterns (no I/O — fast)
+        # Catches unambiguously harmful requests before Haiku is ever called,
+        # so the 200ms Haiku timeout cannot cause fail-open on dangerous content.
+        for pattern in _HARMFUL_PATTERNS:
+            if pattern.search(message):
+                safe_log.warning(
+                    "bouncer.rule_gate.rejected",
+                    user_sub=user_sub,
+                    allowed=False,
+                    reason="harmful_content_detected",
+                )
+                return BounceResult(
+                    allowed=False,
+                    escalate=True,
+                    reason="harmful_content_detected",
                     layer=BouncerLayer.RULE_GATE,
                     confidence=1.0,
                 )

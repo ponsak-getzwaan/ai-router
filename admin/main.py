@@ -21,6 +21,7 @@ from admin.services.cloudwatch import CloudWatchService
 from admin.services.dynamo_admin import DynamoAdminService
 from admin.services.redis_admin import RedisAdminService
 from admin.services.sqs_admin import SQSAdminService
+from bouncer.config import BouncerConfig
 from classifier.classifier import Classifier
 from classifier.config import ClassifierConfig
 from shared.bedrock import BedrockRuntime
@@ -51,6 +52,24 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.redis = redis
 
     bedrock = BedrockRuntime(region=cfg.aws_region)
+
+    # Open persistent Bedrock connections and pre-warm them so the TLS handshake
+    # cost is paid once at startup rather than on the first real Haiku request.
+    bouncer_cfg = BouncerConfig()
+    try:
+        await bedrock.connect()
+        await bedrock.invoke_model(
+            bouncer_cfg.haiku_model_id,
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+        safe_log.info("admin.bedrock.warmup.complete")
+    except Exception as exc:
+        safe_log.warning("admin.bedrock.warmup.failed", error_type=type(exc).__name__)
+
     classifier = Classifier(ClassifierConfig(), bedrock)
     await classifier.initialize()
     application.state.bedrock = bedrock
@@ -59,6 +78,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     safe_log.info("admin.started", service_name="admin")
     yield
 
+    await bedrock.close()
     await redis.close()
     safe_log.info("admin.stopped", service_name="admin")
 

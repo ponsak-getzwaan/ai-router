@@ -49,11 +49,42 @@ def _region_for_model(model_id: str, default: str = BEDROCK_REGION) -> str:
 
 
 class BedrockRuntime:
-    """Async Bedrock runtime client. One instance per process (persistent connections)."""
+    """Async Bedrock runtime client. One instance per process (persistent connections).
+
+    Call ``await runtime.connect()`` once at startup to open the persistent
+    aiohttp session; call ``await runtime.close()`` on shutdown. If connect()
+    has not been called, invoke_model falls back to creating a short-lived
+    client per call (original behaviour, but no connection pooling).
+    """
 
     def __init__(self, region: str = BEDROCK_REGION) -> None:
         self._session: aioboto3.Session = aioboto3.Session()
         self._region = region
+        # Persistent client — populated by connect(), cleared by close().
+        # Keyed by region so apac.* and us.* models each get their own pool.
+        self._clients: dict[str, Any] = {}
+        self._client_ctxs: dict[str, Any] = {}
+
+    async def connect(self, regions: list[str] | None = None) -> None:
+        """Open persistent Bedrock clients for the given regions.
+
+        Defaults to just the primary region. Call once at service startup
+        so the TLS handshake cost is paid before the first real request.
+        """
+        for region in (regions or [self._region]):
+            ctx = self._session.client("bedrock-runtime", region_name=region)
+            self._clients[region] = await ctx.__aenter__()
+            self._client_ctxs[region] = ctx
+
+    async def close(self) -> None:
+        """Close all persistent clients. Call during service shutdown."""
+        for region, ctx in self._client_ctxs.items():
+            try:
+                await ctx.__aexit__(None, None, None)
+            except Exception:
+                pass
+        self._clients.clear()
+        self._client_ctxs.clear()
 
     async def invoke_model(
         self,
@@ -84,18 +115,17 @@ class BedrockRuntime:
             if attempt:
                 await asyncio.sleep(_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
             try:
-                async with self._session.client(
-                    "bedrock-runtime", region_name=invoke_region
-                ) as client:
-                    raw_response = await client.invoke_model(
-                        modelId=model_id,
-                        body=json.dumps(body),
-                        contentType="application/json",
-                        accept="application/json",
+                if invoke_region in self._clients:
+                    result = await self._invoke_with(
+                        self._clients[invoke_region], model_id, body
                     )
-                    raw_body: bytes = await raw_response["body"].read()
-                    result: dict[str, Any] = json.loads(raw_body)
-                    return result
+                else:
+                    # Fallback: short-lived client (no persistent pool for this region).
+                    async with self._session.client(
+                        "bedrock-runtime", region_name=invoke_region
+                    ) as client:
+                        result = await self._invoke_with(client, model_id, body)
+                return result
             except (
                 botocore.exceptions.ReadTimeoutError,
                 botocore.exceptions.ConnectTimeoutError,
@@ -123,6 +153,17 @@ class BedrockRuntime:
                 raise BedrockError(type(exc).__name__) from exc
 
         raise BedrockError(type(last_exc).__name__ if last_exc else "ThrottlingException") from last_exc
+
+    @staticmethod
+    async def _invoke_with(client: Any, model_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        raw_response = await client.invoke_model(
+            modelId=model_id,
+            body=json.dumps(body),
+            contentType="application/json",
+            accept="application/json",
+        )
+        raw_body: bytes = await raw_response["body"].read()
+        return json.loads(raw_body)  # type: ignore[no-any-return]
 
 
 _default_runtime: BedrockRuntime | None = None

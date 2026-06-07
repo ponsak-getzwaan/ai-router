@@ -159,7 +159,7 @@ These checks run on every PR. Don't bypass them.
 
 - Region: `ap-southeast-1` (Singapore). Hard-coded in IAM policy conditions and in the Bedrock client factory in `shared/bedrock.py`.
 - Model IDs (use cross-region inference profiles):
-  - Haiku: `apac.anthropic.claude-3-haiku-20240307-v1:0` — for the Bouncer micro-classifier and Strategist arbitration.
+  - Haiku: `global.anthropic.claude-haiku-4-5-20251001-v1:0` — for the Bouncer micro-classifier and Strategist arbitration. Global cross-region profile (no apac.* exists for Haiku 4.5); invoked from ap-southeast-1. Data-residency trade-off accepted (same rationale as Sonnet). Chosen over Haiku 3 for tighter latency variance (1.3–1.7s vs 1–5s). **Haiku 4.5 wraps JSON in ```json fences** — `llm_classifier.py` strips them before parsing; do not remove that stripping.
   - Sonnet: `global.anthropic.claude-sonnet-4-6` — for deep-path intent classification and default vendor routing. Global cross-region profile, invoked from ap-southeast-1, 10 RPM. Data-residency trade-off: compute may route outside ap-southeast-1 (accepted — no APAC profile exists for this model).
   - Verified active in ap-southeast-1 on 2026-06-07. Do not change without re-verifying via `aws bedrock list-inference-profiles` and a direct test invoke.
   - **TRAP**: `apac.anthropic.claude-sonnet-4-20250514-v1:0` lists as an APAC profile but is LEGACY and returns ResourceNotFoundException — do not use. Claude Sonnet 4.5/4.6 Llama have no APAC profiles. Always test invoke before deploying any new model ID.

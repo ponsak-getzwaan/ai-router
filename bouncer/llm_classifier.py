@@ -135,8 +135,16 @@ class LLMClassifier:
         # Parse Anthropic Messages API response format.
         # If the response is malformed, re-raise as BedrockError so classify()
         # catches it and fails open.
+        # Haiku 4.5 wraps JSON in ```json ... ``` fences despite the "JSON only"
+        # instruction; strip them before parsing.
         try:
-            text: str = response["content"][0]["text"]
+            text: str = response["content"][0]["text"].strip()
+            if text.startswith("```"):
+                # Haiku 4.5 returns ```json\n{...}\n```\nProse — extract the JSON block.
+                inner = text.split("```", 2)[1]   # 'json\n{...}\n'
+                if "\n" in inner:
+                    inner = inner.split("\n", 1)[1]  # strip language tag line
+                text = inner.strip()
             parsed: dict[str, Any] = json.loads(text)
             haiku_pass: bool = bool(parsed.get("pass", False))
             raw_reason: str = str(parsed.get("reason", "unclear"))[:50]

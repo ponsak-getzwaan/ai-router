@@ -31,11 +31,13 @@ class BouncerConfig(BaseSettings):
     # Haiku LLM micro-classifier
     # -------------------------------------------------------------------------
     haiku_model_id: str = Field(
-        default="apac.anthropic.claude-3-haiku-20240307-v1:0",
+        default="global.anthropic.claude-haiku-4-5-20251001-v1:0",
         description=(
             "Bedrock cross-region inference profile ID. "
-            "Verify the exact ID in the Bedrock console before pinning. "
-            "Raw model IDs fail with 'on-demand throughput not supported'."
+            "global.* profiles invoke from ap-southeast-1 but may route compute globally "
+            "(data-residency trade-off accepted — no apac.* profile exists for Haiku 4.5). "
+            "Haiku 4.5 chosen over Haiku 3 for tighter latency variance (1.3–1.7s vs 1–5s). "
+            "Verify with aws bedrock list-inference-profiles before changing."
         ),
     )
     haiku_max_tokens: int = Field(default=50, gt=0, le=100)

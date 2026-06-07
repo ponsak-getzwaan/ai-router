@@ -29,6 +29,48 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _parse_haiku_response(text: str) -> "dict[str, Any]":
+    """Extract the first complete JSON object from Haiku output.
+
+    Handles all observed Haiku 4.5 output formats:
+    - Plain JSON (most common)
+    - JSON followed by prose ("{"pass":true}\\n\\nThis message is safe.")
+    - Fenced JSON ("```json\\n{...}\\n```")
+    - Prose before fenced JSON ("Here is my assessment:\\n\\n```json\\n{...}\\n```")
+    """
+    # Fast path: text is already valid JSON
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Locate the first '{' and scan for the matching '}', respecting string literals.
+    start = text.find("{")
+    if start == -1:
+        raise json.JSONDecodeError("no JSON object found in response", text, 0)
+    depth = 0
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text[start:], start):
+        if esc:
+            esc = False
+            continue
+        if in_str:
+            if ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start : i + 1])
+    raise json.JSONDecodeError("unterminated JSON object in response", text, start)
+
+
 @runtime_checkable
 class MetricPublisher(Protocol):
     """Publishes a single count metric. Injected for testability."""
@@ -107,9 +149,11 @@ class LLMClassifier:
                 timed_out=True,
             )
         except BedrockError as exc:
+            wrapped = exc.args[0] if exc.args else "unknown"
             safe_log.warning(
                 "bouncer.haiku.bedrock_error",
                 error_type=type(exc).__name__,
+                wrapped_error_type=wrapped,
                 allowed=True,
             )
             await self._metrics.put_count("BouncerError", {"Layer": "bouncer"})
@@ -135,17 +179,12 @@ class LLMClassifier:
         # Parse Anthropic Messages API response format.
         # If the response is malformed, re-raise as BedrockError so classify()
         # catches it and fails open.
-        # Haiku 4.5 wraps JSON in ```json ... ``` fences despite the "JSON only"
-        # instruction; strip them before parsing.
+        # Haiku 4.5 may wrap JSON in ```json ... ``` fences, append prose after
+        # the JSON object, or prepend prose before the fence — _parse_haiku_response
+        # handles all observed variants.
         try:
             text: str = response["content"][0]["text"].strip()
-            if text.startswith("```"):
-                # Haiku 4.5 returns ```json\n{...}\n```\nProse — extract the JSON block.
-                inner = text.split("```", 2)[1]   # 'json\n{...}\n'
-                if "\n" in inner:
-                    inner = inner.split("\n", 1)[1]  # strip language tag line
-                text = inner.strip()
-            parsed: dict[str, Any] = json.loads(text)
+            parsed: dict[str, Any] = _parse_haiku_response(text)
             haiku_pass: bool = bool(parsed.get("pass", False))
             raw_reason: str = str(parsed.get("reason", "unclear"))[:50]
             confidence: float = max(0.0, min(1.0, float(parsed.get("confidence", 0.0))))

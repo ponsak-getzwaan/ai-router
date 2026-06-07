@@ -93,6 +93,7 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         # Errors (type names only, never messages)
         "error_type",
         "error_code",
+        "wrapped_error_type",
         "exit_code",
         "http_status",
         # Region / infrastructure

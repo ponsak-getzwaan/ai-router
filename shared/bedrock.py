@@ -150,6 +150,13 @@ class BedrockRuntime:
                     continue
                 raise BedrockError(type(exc).__name__) from exc
             except Exception as exc:
+                from shared.logging import safe_log as _log
+                _log.warning(
+                    "bedrock.unexpected_error",
+                    error_type=type(exc).__name__,
+                    model_id=model_id,
+                    attempt=attempt,
+                )
                 raise BedrockError(type(exc).__name__) from exc
 
         raise BedrockError(type(last_exc).__name__ if last_exc else "ThrottlingException") from last_exc

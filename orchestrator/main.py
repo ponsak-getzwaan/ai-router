@@ -23,26 +23,68 @@ from orchestrator.history import SessionHistory
 from orchestrator.pipeline_driver import PipelineDriver
 from orchestrator.presidio_client import PresidioClient
 from orchestrator.sqs_consumer import SQSConsumer
-from shared.bedrock import get_bedrock_runtime
+from shared.bedrock import BedrockRuntime, get_bedrock_runtime
 from shared.logging import configure, safe_log
 from strategist.config import StrategistConfig
 from strategist.strategist import Strategist
 
 configure(json_output=True)
 
+_KEEPALIVE_INTERVAL_S: float = 20.0
+
 _config = OrchestratorConfig()
 _consumer: SQSConsumer | None = None
+
+
+async def _bedrock_keepalive(bedrock: BedrockRuntime, model_id: str) -> None:
+    """Ping Haiku every 20 s to keep the VPC endpoint connection alive."""
+    while True:
+        await asyncio.sleep(_KEEPALIVE_INTERVAL_S)
+        try:
+            await bedrock.invoke_model(
+                model_id,
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "hi"}],
+                },
+            )
+        except Exception as exc:
+            safe_log.warning("orchestrator.bedrock.keepalive.failed", error_type=type(exc).__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _consumer  # noqa: PLW0603
 
-    bedrock = get_bedrock_runtime()
+    bouncer_cfg = BouncerConfig()
     redis: aioredis.Redis = aioredis.from_url(_config.redis_url, decode_responses=False)  # type: ignore[no-untyped-call]
 
+    # Two isolated Bedrock clients: bouncer_bedrock (Haiku) and bedrock (Sonnet/Cohere).
+    # Isolation prevents long Sonnet calls from disrupting the Haiku connection pool.
+    bedrock = get_bedrock_runtime()
+    bouncer_bedrock = BedrockRuntime(region=_config.aws_region)
+    try:
+        await bedrock.connect()
+        await bouncer_bedrock.connect()
+        await bouncer_bedrock.invoke_model(
+            bouncer_cfg.haiku_model_id,
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+        safe_log.info("orchestrator.bedrock.warmup.complete")
+    except Exception as exc:
+        safe_log.warning("orchestrator.bedrock.warmup.failed", error_type=type(exc).__name__)
+
+    keepalive_task = asyncio.create_task(
+        _bedrock_keepalive(bouncer_bedrock, bouncer_cfg.haiku_model_id)
+    )
+
     presidio = PresidioClient(_config.presidio_url, _config.presidio_timeout_s)
-    bouncer = Bouncer(BouncerConfig(), redis, bedrock)
+    bouncer = Bouncer(bouncer_cfg, redis, bouncer_bedrock)
     classifier = Classifier(ClassifierConfig(), bedrock)
     strategist = Strategist(StrategistConfig(), bedrock)
     audit = AuditLogger(_config.dynamodb_audit_table, _config.aws_region)
@@ -72,7 +114,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if _consumer:
         await _consumer.stop()
     consumer_task.cancel()
+    keepalive_task.cancel()
     await presidio.aclose()
+    await bouncer_bedrock.close()
     await redis.aclose()
 
     safe_log.info("orchestrator.stopped", service_name="orchestrator")

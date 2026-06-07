@@ -22,9 +22,11 @@ class BouncerConfig(BaseSettings):
     # Time budget
     # -------------------------------------------------------------------------
     total_budget_ms: float = Field(
-        default=600.0,
+        default=5000.0,
         gt=0,
-        description="Total time budget for rule gate + Haiku, in milliseconds.",
+        description="Total time budget for rule gate + Haiku, in milliseconds. "
+        "Haiku 4.5 inference takes 1.3–1.7 s warm; 5000 ms gives headroom for "
+        "variance while still failing open in reasonable time if Bedrock is down.",
     )
 
     # -------------------------------------------------------------------------

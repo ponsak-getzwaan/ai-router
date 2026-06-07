@@ -29,11 +29,11 @@ from shared.bedrock import BedrockRuntime
 from shared.logging import configure, safe_log
 
 
-_KEEPALIVE_INTERVAL_S: float = 20.0  # below typical proxy idle-connection timeout
+_KEEPALIVE_INTERVAL_S: float = 20.0  # below typical idle-connection timeout on AWS NLBs
 
 
 async def _bedrock_keepalive(bedrock: BedrockRuntime, model_id: str) -> None:
-    """Ping Haiku every 20 s so the proxy never drops the idle connection."""
+    """Ping Haiku every 20 s to keep the VPC endpoint connection alive."""
     while True:
         await asyncio.sleep(_KEEPALIVE_INTERVAL_S)
         try:

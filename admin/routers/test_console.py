@@ -108,10 +108,9 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     bouncer_bedrock = request.app.state.bouncer_bedrock
     redis_client = aioredis.from_url(cfg.redis_url)
     # Use a wider Haiku budget here than the production default (600 ms).
-    # The admin service runs a keep-alive that keeps the Bedrock connection warm,
-    # so Haiku responds in ~1.7 s on warm connections, but with proxy variance
-    # can take up to ~3.5 s. 4000 ms gives headroom for that variance while
-    # still returning well within a reasonable interactive timeout.
+    # The admin service runs a keep-alive that keeps the Bedrock connection warm.
+    # Haiku inference time varies ~1–4 s depending on APAC cluster load; 4000 ms
+    # gives headroom for that variance while remaining interactive.
     bouncer = Bouncer(BouncerConfig(total_budget_ms=4000.0), redis_client, bouncer_bedrock)
     session_history = SessionHistory(redis_client)
     classifier = request.app.state.classifier

@@ -196,6 +196,23 @@ _EXEMPLARS: dict[IntentDomain, list[str]] = {
     # GENERAL_QA — explanations, comparisons, summaries, how-things-work
     # ------------------------------------------------------------------
     IntentDomain.GENERAL_QA: [
+        # Short definitional questions — "what is X?"
+        "what is a tiger?",
+        "what is Bitcoin?",
+        "what is an API?",
+        "what is inflation?",
+        "what is machine learning?",
+        "what is a mortgage?",
+        "what is photosynthesis?",
+        "what is a VPN?",
+        "what is the stock market?",
+        "what is a CPU?",
+        "what is quantum computing?",
+        "what is a hedge fund?",
+        "what is an ETF?",
+        "what is CPF?",
+        "what is HDB?",
+        "what is GST?",
         # Explanations
         "explain how machine learning works",
         "what is compound interest and how does it work?",
@@ -596,13 +613,13 @@ _FOLLOWUP_PREFIXES: tuple[str, ...] = (
     "better than",
     "worse than",
 )
-_FOLLOWUP_MAX_CHARS: int = 15
+_FOLLOWUP_MAX_CHARS: int = 8
 
 
 def is_followup(message: str) -> bool:
     """Return True if the message looks like a continuation of a prior turn.
 
-    Short messages (≤15 chars) and messages starting with continuation phrases
+    Short messages (≤8 chars) and messages starting with continuation phrases
     are treated as follow-ups. The caller decides whether to skip the fast path.
     """
     stripped = message.strip()

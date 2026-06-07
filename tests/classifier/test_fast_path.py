@@ -104,11 +104,11 @@ class TestIsFollowup:
     def test_short_message_is_followup(self):
         assert is_followup("yes") is True
 
-    def test_exactly_15_chars_is_followup(self):
-        assert is_followup("a" * 15) is True
+    def test_exactly_8_chars_is_followup(self):
+        assert is_followup("a" * 8) is True
 
-    def test_16_chars_not_followup(self):
-        assert is_followup("a" * 16) is False
+    def test_9_chars_not_followup(self):
+        assert is_followup("a" * 9) is False
 
     def test_continuation_prefix_is_followup(self):
         assert is_followup("continue from where we left off") is True

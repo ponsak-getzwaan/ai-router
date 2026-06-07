@@ -86,6 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     presidio = PresidioClient(_config.presidio_url, _config.presidio_timeout_s)
     bouncer = Bouncer(bouncer_cfg, redis, bouncer_bedrock)
     classifier = Classifier(ClassifierConfig(), bedrock)
+    await classifier.initialize()
     strategist = Strategist(StrategistConfig(), bedrock)
     audit = AuditLogger(_config.dynamodb_audit_table, _config.aws_region)
     history = SessionHistory(redis)

@@ -103,6 +103,8 @@ class PipelineDriver:
         vendor_response: str | None = None
         error_type: str | None = None
         envelope: PipelineEnvelope | None = None
+        history_turns_count: int = 0
+        history_stored: bool = False
 
         try:
             # Step 2-3: Redaction + vault
@@ -149,6 +151,7 @@ class PipelineDriver:
 
             # Step 6: Classifier — load history first for follow-up detection
             history_turns = await self._history.get(session_id)
+            history_turns_count = len(history_turns) if history_turns else 0
             intent = await self._classifier.classify(envelope, history=history_turns or None)
             asyncio.create_task(emit_classifier(intent, envelope.bedrock_region))
             if intent.escalate:
@@ -178,6 +181,7 @@ class PipelineDriver:
             await self._history.append(
                 session_id, envelope.redacted_message, vendor_response
             )
+            history_stored = True
 
             # Step 9: De-redact — restore tokens in the vendor response
             restored = await self._vault.restore(cid_str, vendor_response)
@@ -204,6 +208,8 @@ class PipelineDriver:
                     vendor_response=vendor_response,
                     start_time=start,
                     error_type=error_type,
+                    history_turns=history_turns_count,
+                    history_stored=history_stored,
                 )
 
             # Step 11: Vault cleanup — always runs

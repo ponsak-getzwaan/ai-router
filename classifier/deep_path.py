@@ -41,6 +41,10 @@ purchasing, contacting a human agent)
 When the message describes a problem or complaint (e.g. "X is not working"), treat \
 it as general_qa — the user wants help or advice, not a human agent.
 
+If the message is grammatically incomplete or broken English but the topic is still \
+recognisable, classify by the evident topic and intent with confidence ≥ 0.7. \
+Reserve "ambiguous" only for messages where even the subject matter is unclear.
+
 Reply with JSON only:
 {
   "intent": "<intent>",

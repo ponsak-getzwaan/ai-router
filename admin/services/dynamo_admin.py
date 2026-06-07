@@ -121,6 +121,7 @@ class DynamoAdminService:
 
     @staticmethod
     def _parse_audit(item: dict[str, Any]) -> AuditRecord:
+        raw_turns = item.get("intent_history_turns")
         return AuditRecord(
             correlation_id=item.get("correlation_id", ""),
             timestamp=item.get("timestamp", ""),
@@ -131,12 +132,22 @@ class DynamoAdminService:
             was_redacted=bool(item.get("was_redacted", False)),
             bouncer_allowed=item.get("bouncer_allowed"),
             bouncer_escalated=item.get("bouncer_escalated"),
+            bouncer_timed_out=item.get("bouncer_timed_out"),
+            bouncer_reason=item.get("bouncer_reason"),
+            bouncer_confidence=item.get("bouncer_confidence"),
+            bouncer_layer=item.get("bouncer_layer"),
             intent=item.get("intent"),
             intent_confidence=item.get("intent_confidence"),
             intent_escalated=item.get("intent_escalated"),
+            intent_path=item.get("intent_path"),
+            intent_reasoning=item.get("intent_reasoning"),
+            intent_history_turns=int(raw_turns) if raw_turns is not None else None,
             vendor=item.get("vendor"),
             routing_path=item.get("routing_path"),
             policy_blocked=item.get("policy_blocked"),
+            policy_modified=item.get("policy_modified"),
+            applied_policies=item.get("applied_policies"),
+            adapter_history_stored=item.get("adapter_history_stored"),
             total_latency_ms=item.get("total_latency_ms"),
             error_type=item.get("error_type"),
             vendor_response_redacted=item.get("vendor_response_redacted"),

@@ -164,12 +164,22 @@ class AuditRecord(_Out):
     was_redacted: bool
     bouncer_allowed: bool | None
     bouncer_escalated: bool | None
+    bouncer_timed_out: bool | None = None
+    bouncer_reason: str | None = None
+    bouncer_confidence: str | None = None
+    bouncer_layer: str | None = None
     intent: str | None
     intent_confidence: str | None
     intent_escalated: bool | None = None
+    intent_path: str | None = None
+    intent_reasoning: str | None = None
+    intent_history_turns: int | None = None
     vendor: str | None
     routing_path: str | None
     policy_blocked: bool | None
+    policy_modified: bool | None = None
+    applied_policies: list[str] | None = None
+    adapter_history_stored: bool | None = None
     total_latency_ms: str | None
     error_type: str | None
     vendor_response_redacted: str | None = None

@@ -33,6 +33,8 @@ class AuditLogger:
         vendor_response: str | None,
         start_time: float,
         error_type: str | None = None,
+        history_turns: int = 0,
+        history_stored: bool = False,
     ) -> None:
         total_ms = (time.monotonic() - start_time) * 1000.0
         cid = str(envelope.correlation_id)
@@ -50,14 +52,24 @@ class AuditLogger:
             "bouncer_allowed": bounce.allowed if bounce else None,
             "bouncer_escalated": bounce.escalate if bounce else None,
             "bouncer_timed_out": bounce.timed_out if bounce else None,
+            "bouncer_reason": bounce.reason if bounce else None,
+            "bouncer_confidence": str(bounce.confidence) if bounce else None,
+            "bouncer_layer": str(bounce.layer) if bounce else None,
             # Classifier
             "intent": intent.intent if intent else None,
             "intent_confidence": str(intent.confidence) if intent else None,
             "intent_escalated": intent.escalate if intent else None,
+            "intent_path": str(intent.path) if intent else None,
+            "intent_reasoning": intent.reasoning if intent else None,
+            "intent_history_turns": history_turns if intent else None,
             # Strategist
             "vendor": plan.primary_vendor if plan else None,
-            "routing_path": plan.path if plan else None,
+            "routing_path": str(plan.path) if plan else None,
             "policy_blocked": plan.blocked if plan else None,
+            "policy_modified": plan.policy_modified if plan else None,
+            "applied_policies": list(plan.applied_policies) if plan else None,
+            # Adapter
+            "adapter_history_stored": history_stored if vendor_response else None,
             # Vendor response — redacted text (before vault restore), truncated at 4000 chars
             "vendor_response_redacted": vendor_response[:4000] if vendor_response else None,
             # Latency

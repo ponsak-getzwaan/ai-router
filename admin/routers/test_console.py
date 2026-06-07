@@ -57,7 +57,10 @@ def _layers_from_audit(record: AuditRecord) -> list[TestConsoleLayerResult]:
         layers.append(_layer("bouncer", {
             "allowed": record.bouncer_allowed,
             "escalate": bool(record.bouncer_escalated),
-            "timed_out": False,
+            "timed_out": bool(record.bouncer_timed_out),
+            "confidence": record.bouncer_confidence,
+            "reason": record.bouncer_reason,
+            "layer": record.bouncer_layer,
         }))
         if not record.bouncer_allowed or record.bouncer_escalated:
             return layers
@@ -68,6 +71,9 @@ def _layers_from_audit(record: AuditRecord) -> list[TestConsoleLayerResult]:
             "intent": record.intent,
             "confidence": record.intent_confidence,
             "escalate": bool(record.intent_escalated),
+            "path": record.intent_path,
+            "history_turns": record.intent_history_turns,
+            "reasoning": record.intent_reasoning,
         }))
         if record.intent_escalated:
             return layers
@@ -78,13 +84,18 @@ def _layers_from_audit(record: AuditRecord) -> list[TestConsoleLayerResult]:
             "primary_vendor": record.vendor,
             "path": record.routing_path,
             "blocked": bool(record.policy_blocked),
+            "policy_modified": record.policy_modified,
+            "applied_policies": record.applied_policies or [],
         }))
         if record.policy_blocked:
             return layers
 
     # Adapter — only when a vendor actually responded
     if record.vendor is not None and not record.policy_blocked:
-        layers.append(_layer("adapter", {"vendor": record.vendor}))
+        layers.append(_layer("adapter", {
+            "vendor": record.vendor,
+            "history_stored": record.adapter_history_stored,
+        }))
 
     return layers
 

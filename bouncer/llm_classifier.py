@@ -83,17 +83,15 @@ class LLMClassifier:
     ) -> BounceResult:
         """Classify the message using Haiku. Never raises — always returns a BounceResult."""
         budget_s = remaining_budget_ms / 1000.0
-        # Use asyncio.shield so the underlying Bedrock HTTP request is NOT cancelled on
-        # timeout. Cancelling an aioboto3 client mid-flight corrupts the shared connection
-        # pool, causing every subsequent call to fail. shield() lets the task finish
-        # normally in the background so connections are returned cleanly to the pool.
-        task: asyncio.Task[BounceResult] = asyncio.create_task(self._invoke(envelope))
+        # Do NOT use asyncio.shield here. shield() lets the background task continue
+        # holding the aiohttp connection after a timeout, which blocks all subsequent
+        # callers that share the same client. Cancellation closes the connection so the
+        # next request opens a fresh one (one cold reconnect vs. cascading stalls).
+        # bouncer_bedrock is a dedicated Haiku-only client, so cancellation does not
+        # affect the Sonnet classifier connection pool.
         try:
-            return await asyncio.wait_for(asyncio.shield(task), timeout=budget_s)
+            return await asyncio.wait_for(self._invoke(envelope), timeout=budget_s)
         except TimeoutError:
-            # Retrieve the eventual result/exception so Python doesn't log
-            # "Task exception was never retrieved" when the background task finishes.
-            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
             safe_log.warning(
                 "bouncer.haiku.timeout",
                 error_type="TimeoutError",
@@ -109,7 +107,6 @@ class LLMClassifier:
                 timed_out=True,
             )
         except BedrockError as exc:
-            task.cancel()
             safe_log.warning(
                 "bouncer.haiku.bedrock_error",
                 error_type=type(exc).__name__,

@@ -9,6 +9,7 @@ IAM role denies: bedrock:*, sqs:SendMessage (incoming queue), dynamodb:DeleteIte
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -26,6 +27,26 @@ from classifier.classifier import Classifier
 from classifier.config import ClassifierConfig
 from shared.bedrock import BedrockRuntime
 from shared.logging import configure, safe_log
+
+
+_KEEPALIVE_INTERVAL_S: float = 20.0  # below typical proxy idle-connection timeout
+
+
+async def _bedrock_keepalive(bedrock: BedrockRuntime, model_id: str) -> None:
+    """Ping Haiku every 20 s so the proxy never drops the idle connection."""
+    while True:
+        await asyncio.sleep(_KEEPALIVE_INTERVAL_S)
+        try:
+            await bedrock.invoke_model(
+                model_id,
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "hi"}],
+                },
+            )
+        except Exception as exc:
+            safe_log.warning("admin.bedrock.keepalive.failed", error_type=type(exc).__name__)
 
 
 @asynccontextmanager
@@ -55,10 +76,15 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
     # Open persistent Bedrock connections and pre-warm them so the TLS handshake
     # cost is paid once at startup rather than on the first real Haiku request.
+    # Two separate clients: one for the bouncer (Haiku) and one for the classifier
+    # (Sonnet).  A long Sonnet call must not tie up the Haiku connection and cause
+    # the next bouncer call to pay a fresh handshake.
     bouncer_cfg = BouncerConfig()
+    bouncer_bedrock = BedrockRuntime(region=cfg.aws_region)
     try:
-        await bedrock.connect()
-        await bedrock.invoke_model(
+        await bedrock.connect()       # classifier / strategist Sonnet client
+        await bouncer_bedrock.connect()  # bouncer Haiku client (isolated)
+        await bouncer_bedrock.invoke_model(
             bouncer_cfg.haiku_model_id,
             {
                 "anthropic_version": "bedrock-2023-05-31",
@@ -70,15 +96,22 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         safe_log.warning("admin.bedrock.warmup.failed", error_type=type(exc).__name__)
 
+    keepalive_task = asyncio.create_task(
+        _bedrock_keepalive(bouncer_bedrock, bouncer_cfg.haiku_model_id)
+    )
+
     classifier = Classifier(ClassifierConfig(), bedrock)
     await classifier.initialize()
     application.state.bedrock = bedrock
+    application.state.bouncer_bedrock = bouncer_bedrock
     application.state.classifier = classifier
 
     safe_log.info("admin.started", service_name="admin")
     yield
 
+    keepalive_task.cancel()
     await bedrock.close()
+    await bouncer_bedrock.close()
     await redis.close()
     safe_log.info("admin.stopped", service_name="admin")
 

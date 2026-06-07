@@ -100,11 +100,19 @@ async def test_console(body: TestConsoleRequest, request: Request) -> TestConsol
     layers: list[TestConsoleLayerResult] = []
     cfg = request.app.state.config
 
-    # Reuse the startup BedrockRuntime — shares the HTTP connection pool across
-    # requests so the bouncer Haiku call gets a warm connection, not a cold TLS start.
+    # Two isolated BedrockRuntime instances from startup:
+    # - bouncer_bedrock: dedicated to Haiku bouncer calls, kept warm by keep-alive task
+    # - bedrock: shared Sonnet client for classifier and strategist
+    # Isolation prevents a long Sonnet call from disrupting the Haiku connection pool.
     bedrock = request.app.state.bedrock
+    bouncer_bedrock = request.app.state.bouncer_bedrock
     redis_client = aioredis.from_url(cfg.redis_url)
-    bouncer = Bouncer(BouncerConfig(), redis_client, bedrock)
+    # Use a wider Haiku budget here than the production default (600 ms).
+    # The admin service runs a keep-alive that keeps the Bedrock connection warm,
+    # so Haiku responds in ~1.7 s on warm connections, but with proxy variance
+    # can take up to ~3.5 s. 4000 ms gives headroom for that variance while
+    # still returning well within a reasonable interactive timeout.
+    bouncer = Bouncer(BouncerConfig(total_budget_ms=4000.0), redis_client, bouncer_bedrock)
     session_history = SessionHistory(redis_client)
     classifier = request.app.state.classifier
     strategist = Strategist(StrategistConfig(), bedrock)

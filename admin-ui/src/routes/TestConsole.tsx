@@ -300,10 +300,9 @@ export function TestConsole() {
       const raw = await apiFetch<unknown>("/admin/test-console", {
         method: "POST",
         body: JSON.stringify({
-          redacted_message: userMessage,
+          message: userMessage,
           user_sub: values.user_sub.trim() || "admin-test-user",
           session_id: values.session_id.trim() || "admin-test-session",
-          dry_run: false,
         }),
       });
       const result = TestConsoleResponseSchema.parse(raw);

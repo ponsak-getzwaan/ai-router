@@ -1,130 +1,87 @@
 """Tests for POST /admin/test-console.
 
-The test console traces a pre-redacted message through bouncer → classifier →
-strategist. It is always dry_run in Phase 1; the vendor adapter is never invoked.
+The test console submits the raw message to the incoming SQS queue and polls
+the DynamoDB audit table for the result. Tests mock _send_to_sqs and
+dynamo.query_audit — no pipeline layers are instantiated directly.
 """
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from contextlib import ExitStack
+from unittest.mock import AsyncMock, patch
 
-from tests.admin.conftest import AdminCtx
+import pytest
 
+from admin.config import AdminConfig
+from admin.main import app as admin_app
+from admin.models import AuditQuery, AuditRecord
+from tests.admin.conftest import AdminCtx, make_audit_record
 
-def _make_bounce_result(
-    *,
-    allowed: bool = True,
-    reason: str = "passed",
-    escalate: bool = False,
-    timed_out: bool = False,
-) -> MagicMock:
-    result = MagicMock()
-    result.allowed = allowed
-    result.reason = reason
-    result.layer = "rule_gate"
-    result.confidence = 0.95
-    result.escalate = escalate
-    result.timed_out = timed_out
-    return result
+_SQS_TEST_URL = "https://sqs.ap-southeast-1.amazonaws.com/012345678901/ai-router-incoming"
 
 
-def _make_intent_result(
-    *,
-    intent: str = "general_qa",
-    escalate: bool = False,
-) -> MagicMock:
-    result = MagicMock()
-    result.intent = intent
-    result.domain = "general"
-    result.confidence = 0.92
-    result.path = "fast_path"
-    result.escalate = escalate
-    return result
+def _make_audit_record(**kwargs: object) -> AuditRecord:
+    base = make_audit_record()
+    return base.model_copy(update=kwargs)
 
 
-def _make_routing_plan() -> MagicMock:
-    plan = MagicMock()
-    plan.primary_vendor = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    plan.path = "deterministic"
-    plan.blocked = False
-    plan.policy_modified = False
-    plan.applied_policies = []
-    return plan
+def _patch_sqs() -> "AbstractContextManager[AsyncMock]":
+    return patch("admin.routers.test_console._send_to_sqs", new_callable=AsyncMock)
 
 
-def _patch_pipeline(bounce_result=None, intent_result=None, routing_plan=None):
-    """Context manager that patches all three pipeline layers."""
-    bounce_result = bounce_result or _make_bounce_result()
-    intent_result = intent_result or _make_intent_result()
-    routing_plan = routing_plan or _make_routing_plan()
-
-    mock_bouncer = MagicMock()
-    mock_bouncer.bounce = AsyncMock(return_value=bounce_result)
-
-    mock_classifier = MagicMock()
-    mock_classifier.classify = AsyncMock(return_value=intent_result)
-
-    mock_strategist = MagicMock()
-    mock_strategist.route = AsyncMock(return_value=routing_plan)
-
-    mock_redis = AsyncMock()
-
-    return (
-        patch("admin.routers.test_console.Bouncer", return_value=mock_bouncer),
-        patch("admin.routers.test_console.Classifier", return_value=mock_classifier),
-        patch("admin.routers.test_console.Strategist", return_value=mock_strategist),
-        patch("admin.routers.test_console.BedrockRuntime"),
-        patch("admin.routers.test_console.aioredis.from_url", return_value=mock_redis),
-    )
+def _set_sqs_url(url: str = _SQS_TEST_URL) -> None:
+    """Configure a non-empty sqs_incoming_url on app.state.config."""
+    admin_app.state.config = AdminConfig(sqs_incoming_url=url)
 
 
 class TestTestConsoleResponseShape:
     async def test_returns_200(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
         assert resp.status_code == 200
 
     async def test_response_has_required_fields(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
         data = resp.json()
         assert "correlation_id" in data
-        assert "dry_run" in data
         assert "layers" in data
         assert "total_latency_ms" in data
+        assert "timed_out" in data
+        assert "final_vendor" in data
 
-    async def test_dry_run_defaults_to_true(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    async def test_no_dry_run_field_in_response(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
-        assert resp.json()["dry_run"] is True
+        assert "dry_run" not in resp.json()
 
     async def test_layers_list_is_present(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
         assert isinstance(resp.json()["layers"], list)
 
     async def test_each_layer_has_name_latency_outcome(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
         for layer in resp.json()["layers"]:
             assert "layer" in layer
@@ -132,118 +89,234 @@ class TestTestConsoleResponseShape:
             assert "outcome" in layer
 
 
-class TestTestConsolePipelineFlow:
-    async def test_bouncer_allowed_proceeds_to_classifier(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline(
-            bounce_result=_make_bounce_result(allowed=True),
-            intent_result=_make_intent_result(),
-        )
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+class TestTestConsolePipelineTrace:
+    async def test_redactor_layer_always_present(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
+            )
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
+        assert "redactor" in layer_names
+
+    async def test_redactor_reports_was_redacted_true(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(
+                records=[_make_audit_record(was_redacted=True, entity_count=1)],
+                count=1,
+                last_evaluated_key=None,
+            )
+        )
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "My IC is S1234567A"},
+            )
+        redactor = next(lyr for lyr in resp.json()["layers"] if lyr["layer"] == "redactor")
+        assert redactor["outcome"]["was_redacted"] is True
+        assert redactor["outcome"]["entity_count"] == 1
+
+    async def test_bouncer_layer_present_when_record_has_bouncer_allowed(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "bouncer" in layer_names
-        assert "classifier" in layer_names
 
-    async def test_bouncer_rejection_stops_pipeline(self, ctx: AdminCtx) -> None:
-        """When bouncer rejects, classifier and strategist must not run."""
-        patches = _patch_pipeline(
-            bounce_result=_make_bounce_result(allowed=False, reason="banned_user"),
-        )
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    async def test_classifier_layer_present_when_intent_set(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
+            )
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
+        assert "classifier" in layer_names
+
+    async def test_strategist_layer_present_when_vendor_set(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "What is VAULT_3A4B?"},
+            )
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
+        assert "strategist" in layer_names
+
+    async def test_adapter_layer_present_when_vendor_not_blocked(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "What is VAULT_3A4B?"},
+            )
+        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
+        assert "adapter" in layer_names
+
+    async def test_bouncer_blocked_stops_pipeline(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(
+                records=[_make_audit_record(
+                    bouncer_allowed=False,
+                    bouncer_escalated=False,
+                    intent=None,
+                    vendor=None,
+                    routing_path=None,
+                    policy_blocked=None,
+                )],
+                count=1,
+                last_evaluated_key=None,
+            )
+        )
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "do something illegal"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "bouncer" in layer_names
         assert "classifier" not in layer_names
         assert "strategist" not in layer_names
 
-    async def test_classifier_runs_after_bouncer_passes(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    async def test_classifier_escalated_stops_pipeline(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(
+                records=[_make_audit_record(
+                    intent="general_qa",
+                    intent_escalated=True,
+                    vendor=None,
+                    routing_path=None,
+                    policy_blocked=None,
+                )],
+                count=1,
+                last_evaluated_key=None,
+            )
+        )
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "unclear question"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "classifier" in layer_names
-
-    async def test_strategist_skipped_when_classifier_escalates(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline(intent_result=_make_intent_result(escalate=True))
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            resp = await ctx.client.post(
-                "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
-            )
-        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
         assert "strategist" not in layer_names
 
-    async def test_dry_run_false_adds_skipped_adapter_layer(self, ctx: AdminCtx) -> None:
-        """dry_run=False still skips vendor invocation but records the adapter layer."""
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    async def test_policy_blocked_sets_final_vendor_none(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(
+                records=[_make_audit_record(
+                    vendor="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                    policy_blocked=True,
+                )],
+                count=1,
+                last_evaluated_key=None,
+            )
+        )
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?", "dry_run": False},
+                json={"message": "route me"},
             )
-        layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
-        assert "adapter" in layer_names
-        adapter = next(lyr for lyr in resp.json()["layers"] if lyr["layer"] == "adapter")
-        assert "skipped" in adapter["outcome"]
+        assert resp.json()["final_vendor"] is None
 
-    async def test_bouncer_error_continues_with_error_type(self, ctx: AdminCtx) -> None:
-        mock_bouncer = MagicMock()
-        mock_bouncer.bounce = AsyncMock(side_effect=RuntimeError("connection refused"))
-        mock_redis = AsyncMock()
+    async def test_final_vendor_set_when_not_blocked(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "What is VAULT_3A4B?"},
+            )
+        assert resp.json()["final_vendor"] == "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
+    async def test_response_field_passes_through_vendor_response(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(
+                records=[_make_audit_record(vendor_response_redacted="The answer is 42.")],
+                count=1,
+                last_evaluated_key=None,
+            )
+        )
+        with _patch_sqs():
+            resp = await ctx.client.post(
+                "/admin/test-console",
+                json={"message": "What is the answer?"},
+            )
+        assert resp.json()["response"] == "The answer is 42."
+
+
+class TestTestConsoleTimeout:
+    async def test_timeout_returns_timed_out_true(self, ctx: AdminCtx) -> None:
+        _set_sqs_url()
+        ctx.dynamo.query_audit = AsyncMock(
+            return_value=AuditQuery(records=[], count=0, last_evaluated_key=None)
+        )
         with (
-            patch("admin.routers.test_console.Bouncer", return_value=mock_bouncer),
-            patch("admin.routers.test_console.Classifier"),
-            patch("admin.routers.test_console.Strategist"),
-            patch("admin.routers.test_console.BedrockRuntime"),
-            patch("admin.routers.test_console.aioredis.from_url", return_value=mock_redis),
+            _patch_sqs(),
+            patch("admin.routers.test_console._POLL_TIMEOUT_S", 0.1),
+            patch("admin.routers.test_console._POLL_INTERVAL_S", 0.05),
         ):
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "What is VAULT_3A4B?"},
+                json={"message": "What is VAULT_3A4B?"},
             )
+        data = resp.json()
         assert resp.status_code == 200
-        bouncer_layer = next(
-            (lyr for lyr in resp.json()["layers"] if lyr["layer"] == "bouncer"), None
+        assert data["timed_out"] is True
+        assert data["layers"] == []
+        assert data["final_vendor"] is None
+
+    async def test_sqs_not_configured_returns_error(self, ctx: AdminCtx) -> None:
+        # Leave sqs_incoming_url as "" (default from conftest AdminConfig())
+        resp = await ctx.client.post(
+            "/admin/test-console",
+            json={"message": "test"},
         )
-        assert bouncer_layer is not None
-        assert "error_type" in bouncer_layer["outcome"]
-        assert bouncer_layer["outcome"]["error_type"] == "RuntimeError"
+        data = resp.json()
+        assert resp.status_code == 200
+        assert data["error"] == "SQSNotConfigured"
 
 
 class TestTestConsoleValidation:
-    async def test_empty_redacted_message_returns_422(self, ctx: AdminCtx) -> None:
+    async def test_empty_message_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.post(
             "/admin/test-console",
-            json={"redacted_message": ""},
+            json={"message": ""},
         )
         assert resp.status_code == 422
 
-    async def test_missing_redacted_message_returns_422(self, ctx: AdminCtx) -> None:
+    async def test_missing_message_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.post("/admin/test-console", json={})
         assert resp.status_code == 422
 
     async def test_message_over_4096_chars_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.post(
             "/admin/test-console",
-            json={"redacted_message": "x" * 4097},
+            json={"message": "x" * 4097},
         )
         assert resp.status_code == 422
 
     async def test_message_exactly_4096_chars_accepted(self, ctx: AdminCtx) -> None:
-        patches = _patch_pipeline()
-        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        _set_sqs_url()
+        with _patch_sqs():
             resp = await ctx.client.post(
                 "/admin/test-console",
-                json={"redacted_message": "x" * 4096},
+                json={"message": "x" * 4096},
             )
         assert resp.status_code == 200
+
+    async def test_old_redacted_message_field_returns_422(self, ctx: AdminCtx) -> None:
+        """Ensure the old API shape is rejected (extra='forbid' on the model)."""
+        resp = await ctx.client.post(
+            "/admin/test-console",
+            json={"redacted_message": "hello"},
+        )
+        assert resp.status_code == 422

@@ -172,27 +172,23 @@ class TestRoutingRuleUpdateSchema:
 class TestConsoleRequestSchema:
     def test_empty_message_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            ConsoleRequest(redacted_message="")
+            ConsoleRequest(message="")
 
     def test_message_over_4096_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            ConsoleRequest(redacted_message="x" * 4097)
+            ConsoleRequest(message="x" * 4097)
 
     def test_message_at_4096_accepted(self) -> None:
-        req = ConsoleRequest(redacted_message="x" * 4096)
-        assert len(req.redacted_message) == 4096
-
-    def test_dry_run_defaults_to_true(self) -> None:
-        req = ConsoleRequest(redacted_message="hello")
-        assert req.dry_run is True
+        req = ConsoleRequest(message="x" * 4096)
+        assert len(req.message) == 4096
 
     def test_user_sub_has_default(self) -> None:
-        req = ConsoleRequest(redacted_message="hello")
+        req = ConsoleRequest(message="hello")
         assert req.user_sub == "admin-test-user"
 
     def test_extra_fields_rejected(self) -> None:
         with pytest.raises(ValidationError):
             ConsoleRequest(  # type: ignore[call-arg]
-                redacted_message="hello",
+                message="hello",
                 raw_input="bad",
             )

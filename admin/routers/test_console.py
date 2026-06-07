@@ -24,7 +24,7 @@ from admin.models import AuditRecord, TestConsoleLayerResult, TestConsoleRequest
 from admin.services.dynamo_admin import DynamoAdminService
 from shared.logging import safe_log
 
-router = APIRouter(prefix="/admin", tags=["test-console"])
+router = APIRouter(prefix="/admin/api", tags=["test-console"])
 
 _POLL_INTERVAL_S: float = 2.0
 _POLL_TIMEOUT_S: float = 30.0

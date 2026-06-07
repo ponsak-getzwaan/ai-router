@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from admin.models import EscalationAction, EscalationList
 from admin.services.sqs_admin import SQSAdminService
 
-router = APIRouter(prefix="/admin/escalations", tags=["escalations"])
+router = APIRouter(prefix="/admin/api/escalations", tags=["escalations"])
 
 
 def _svc(request: Request) -> SQSAdminService:

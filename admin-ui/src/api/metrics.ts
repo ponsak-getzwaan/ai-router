@@ -25,7 +25,7 @@ export function usePipelineMetrics(window: TimeWindow) {
     queryKey: ["metrics", "pipeline", periodMinutes],
     queryFn: async (): Promise<PipelineMetrics> => {
       const raw = await apiFetch<unknown>(
-        `/admin/metrics/pipeline?period_minutes=${periodMinutes}`
+        `/admin/api/metrics/pipeline?period_minutes=${periodMinutes}`
       );
       return PipelineMetricsSchema.parse(raw);
     },
@@ -40,7 +40,7 @@ export function useBouncerMetrics(window: TimeWindow) {
     queryKey: ["metrics", "bouncer", periodMinutes],
     queryFn: async (): Promise<BouncerMetrics> => {
       const raw = await apiFetch<unknown>(
-        `/admin/metrics/bouncer?period_minutes=${periodMinutes}`
+        `/admin/api/metrics/bouncer?period_minutes=${periodMinutes}`
       );
       return BouncerMetricsSchema.parse(raw);
     },
@@ -55,7 +55,7 @@ export function useClassifierMetrics(window: TimeWindow) {
     queryKey: ["metrics", "classifier", periodMinutes],
     queryFn: async (): Promise<ClassifierMetrics> => {
       const raw = await apiFetch<unknown>(
-        `/admin/metrics/classifier?period_minutes=${periodMinutes}`
+        `/admin/api/metrics/classifier?period_minutes=${periodMinutes}`
       );
       return ClassifierMetricsSchema.parse(raw);
     },
@@ -70,7 +70,7 @@ export function useStrategistMetrics(window: TimeWindow) {
     queryKey: ["metrics", "strategist", periodMinutes],
     queryFn: async (): Promise<StrategistMetrics> => {
       const raw = await apiFetch<unknown>(
-        `/admin/metrics/strategist?period_minutes=${periodMinutes}`
+        `/admin/api/metrics/strategist?period_minutes=${periodMinutes}`
       );
       return StrategistMetricsSchema.parse(raw);
     },

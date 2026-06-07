@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Request
 from admin.models import BouncerMetrics, ClassifierMetrics, PipelineMetrics, RedactionMetrics, StrategistMetrics
 from admin.services.cloudwatch import CloudWatchService
 
-router = APIRouter(prefix="/admin/metrics", tags=["metrics"])
+router = APIRouter(prefix="/admin/api/metrics", tags=["metrics"])
 
 
 def _cw(request: Request) -> CloudWatchService:

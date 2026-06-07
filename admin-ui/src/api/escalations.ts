@@ -12,7 +12,7 @@ export function useEscalations() {
   return useQuery({
     queryKey: QUERY_KEY,
     queryFn: async (): Promise<EscalationList> => {
-      const raw = await apiFetch<unknown>("/admin/escalations?max_messages=10");
+      const raw = await apiFetch<unknown>("/admin/api/escalations?max_messages=10");
       return EscalationListSchema.parse(raw);
     },
     refetchInterval: (query) =>

@@ -13,14 +13,14 @@ from tests.admin.conftest import AdminCtx
 
 class TestHealthAllOk:
     async def test_returns_200(self, ctx: AdminCtx) -> None:
-        resp = await ctx.client.get("/admin/health")
+        resp = await ctx.client.get("/admin/api/health")
         assert resp.status_code == 200
 
     async def test_status_ok_when_all_healthy(self, ctx: AdminCtx) -> None:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_healthy_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         data = resp.json()
         assert data["status"] == "ok"
         assert data["dynamodb"] == "ok"
@@ -30,7 +30,7 @@ class TestHealthAllOk:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_healthy_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         assert "checked_at" in resp.json()
 
 
@@ -39,7 +39,7 @@ class TestHealthDynamoDown:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_failing_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         data = resp.json()
         assert data["status"] == "degraded"
         assert data["dynamodb"] == "unavailable"
@@ -49,7 +49,7 @@ class TestHealthDynamoDown:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_failing_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         assert resp.status_code == 200  # Always 200; payload conveys health
 
 
@@ -59,7 +59,7 @@ class TestHealthRedisDown:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_healthy_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         data = resp.json()
         assert data["status"] == "degraded"
         assert data["redis"] == "unavailable"
@@ -69,7 +69,7 @@ class TestHealthRedisDown:
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_healthy_dynamo(mock_boto)
             _stub_healthy_sqs(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         assert resp.json()["dynamodb"] == "ok"
 
 
@@ -78,7 +78,7 @@ class TestHealthSqsNotConfigured:
         # Default config has sqs_escalation_url="" so SQS is not probed
         with patch("admin.routers.health.aioboto3") as mock_boto:
             _stub_healthy_dynamo(mock_boto)
-            resp = await ctx.client.get("/admin/health")
+            resp = await ctx.client.get("/admin/api/health")
         assert resp.json()["sqs"] == "not_configured"
 
 

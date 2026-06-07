@@ -16,7 +16,7 @@ from fastapi import APIRouter, Query, Request
 from admin.models import AuditQuery
 from admin.services.dynamo_admin import DynamoAdminService
 
-router = APIRouter(prefix="/admin/audit", tags=["audit"])
+router = APIRouter(prefix="/admin/api/audit", tags=["audit"])
 
 
 def _svc(request: Request) -> DynamoAdminService:

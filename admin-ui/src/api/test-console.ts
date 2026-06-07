@@ -5,7 +5,7 @@ import { TestConsoleResponseSchema, type TestConsoleRequest, type TestConsoleRes
 export function useRunTrace() {
   return useMutation({
     mutationFn: async (body: TestConsoleRequest): Promise<TestConsoleResponse> => {
-      const raw = await apiFetch<unknown>("/admin/test-console", {
+      const raw = await apiFetch<unknown>("/admin/api/test-console", {
         method: "POST",
         body: JSON.stringify(body),
       });

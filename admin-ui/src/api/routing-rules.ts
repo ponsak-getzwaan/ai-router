@@ -14,7 +14,7 @@ export function useRoutingRules() {
   return useQuery({
     queryKey: LIST_KEY,
     queryFn: async (): Promise<RoutingRule[]> => {
-      const raw = await apiFetch<unknown>("/admin/routing-rules");
+      const raw = await apiFetch<unknown>("/admin/api/routing-rules");
       return z.array(RoutingRuleSchema).parse(raw);
     },
     staleTime: 60_000,

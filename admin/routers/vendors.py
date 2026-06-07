@@ -20,7 +20,7 @@ import boto3
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/admin/vendors", tags=["vendors"])
+router = APIRouter(prefix="/admin/api/vendors", tags=["vendors"])
 
 # ---------------------------------------------------------------------------
 # Region config

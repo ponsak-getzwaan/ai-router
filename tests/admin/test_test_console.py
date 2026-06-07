@@ -39,7 +39,7 @@ class TestTestConsoleResponseShape:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         assert resp.status_code == 200
@@ -48,7 +48,7 @@ class TestTestConsoleResponseShape:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         data = resp.json()
@@ -62,7 +62,7 @@ class TestTestConsoleResponseShape:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         assert "dry_run" not in resp.json()
@@ -71,7 +71,7 @@ class TestTestConsoleResponseShape:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         assert isinstance(resp.json()["layers"], list)
@@ -80,7 +80,7 @@ class TestTestConsoleResponseShape:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         for layer in resp.json()["layers"]:
@@ -94,7 +94,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -111,7 +111,7 @@ class TestTestConsolePipelineTrace:
         )
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "My IC is S1234567A"},
             )
         redactor = next(lyr for lyr in resp.json()["layers"] if lyr["layer"] == "redactor")
@@ -122,7 +122,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -132,7 +132,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -142,7 +142,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -152,7 +152,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -176,7 +176,7 @@ class TestTestConsolePipelineTrace:
         )
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "do something illegal"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -201,7 +201,7 @@ class TestTestConsolePipelineTrace:
         )
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "unclear question"},
             )
         layer_names = [lyr["layer"] for lyr in resp.json()["layers"]]
@@ -222,7 +222,7 @@ class TestTestConsolePipelineTrace:
         )
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "route me"},
             )
         assert resp.json()["final_vendor"] is None
@@ -231,7 +231,7 @@ class TestTestConsolePipelineTrace:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         assert resp.json()["final_vendor"] == "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
@@ -247,7 +247,7 @@ class TestTestConsolePipelineTrace:
         )
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is the answer?"},
             )
         assert resp.json()["response"] == "The answer is 42."
@@ -265,7 +265,7 @@ class TestTestConsoleTimeout:
             patch("admin.routers.test_console._POLL_INTERVAL_S", 0.05),
         ):
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "What is VAULT_3A4B?"},
             )
         data = resp.json()
@@ -277,7 +277,7 @@ class TestTestConsoleTimeout:
     async def test_sqs_not_configured_returns_error(self, ctx: AdminCtx) -> None:
         # Leave sqs_incoming_url as "" (default from conftest AdminConfig())
         resp = await ctx.client.post(
-            "/admin/test-console",
+            "/admin/api/test-console",
             json={"message": "test"},
         )
         data = resp.json()
@@ -288,18 +288,18 @@ class TestTestConsoleTimeout:
 class TestTestConsoleValidation:
     async def test_empty_message_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.post(
-            "/admin/test-console",
+            "/admin/api/test-console",
             json={"message": ""},
         )
         assert resp.status_code == 422
 
     async def test_missing_message_returns_422(self, ctx: AdminCtx) -> None:
-        resp = await ctx.client.post("/admin/test-console", json={})
+        resp = await ctx.client.post("/admin/api/test-console", json={})
         assert resp.status_code == 422
 
     async def test_message_over_4096_chars_returns_422(self, ctx: AdminCtx) -> None:
         resp = await ctx.client.post(
-            "/admin/test-console",
+            "/admin/api/test-console",
             json={"message": "x" * 4097},
         )
         assert resp.status_code == 422
@@ -308,7 +308,7 @@ class TestTestConsoleValidation:
         _set_sqs_url()
         with _patch_sqs():
             resp = await ctx.client.post(
-                "/admin/test-console",
+                "/admin/api/test-console",
                 json={"message": "x" * 4096},
             )
         assert resp.status_code == 200
@@ -316,7 +316,7 @@ class TestTestConsoleValidation:
     async def test_old_redacted_message_field_returns_422(self, ctx: AdminCtx) -> None:
         """Ensure the old API shape is rejected (extra='forbid' on the model)."""
         resp = await ctx.client.post(
-            "/admin/test-console",
+            "/admin/api/test-console",
             json={"redacted_message": "hello"},
         )
         assert resp.status_code == 422

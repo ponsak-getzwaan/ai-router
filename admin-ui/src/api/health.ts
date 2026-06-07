@@ -6,7 +6,7 @@ export function useServiceHealth() {
   return useQuery({
     queryKey: ["health"],
     queryFn: async (): Promise<ServiceHealth> => {
-      const raw = await apiFetch<unknown>("/admin/health");
+      const raw = await apiFetch<unknown>("/admin/api/health");
       return ServiceHealthSchema.parse(raw);
     },
     refetchInterval: 10_000,

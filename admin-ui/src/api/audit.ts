@@ -20,7 +20,7 @@ export function useAuditLog(params: AuditParams) {
       if (params.correlationId) qs.set("correlation_id", params.correlationId);
       if (params.limit) qs.set("limit", String(params.limit));
       if (params.cursor) qs.set("cursor", params.cursor);
-      const raw = await apiFetch<unknown>(`/admin/audit?${qs.toString()}`);
+      const raw = await apiFetch<unknown>(`/admin/api/audit?${qs.toString()}`);
       return AuditQuerySchema.parse(raw);
     },
     staleTime: 30_000,

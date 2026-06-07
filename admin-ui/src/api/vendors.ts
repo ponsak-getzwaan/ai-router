@@ -23,7 +23,7 @@ export function useVendors() {
   return useQuery({
     queryKey: ["vendors"],
     queryFn: async (): Promise<VendorGroup[]> => {
-      const raw = await apiFetch<unknown>("/admin/vendors");
+      const raw = await apiFetch<unknown>("/admin/api/vendors");
       return VendorGroupsSchema.parse(raw);
     },
     staleTime: 5 * 60_000, // profiles don't change often — cache for 5 min

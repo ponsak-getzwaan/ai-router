@@ -105,9 +105,9 @@ resource "aws_cloudfront_distribution" "admin_spa" {
     cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   }
 
-  # /admin/* — API calls routed to ALB; no caching, all headers forwarded
+  # /admin/api/* — API calls routed to ALB; no caching, all headers forwarded
   ordered_cache_behavior {
-    path_pattern           = "/admin/*"
+    path_pattern           = "/admin/api/*"
     target_origin_id       = "alb-admin-api"
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]

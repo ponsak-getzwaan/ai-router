@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from admin.models import RoutingRule, RoutingRuleUpdate
 from admin.services.dynamo_admin import DynamoAdminService
 
-router = APIRouter(prefix="/admin/routing-rules", tags=["routing-rules"])
+router = APIRouter(prefix="/admin/api/routing-rules", tags=["routing-rules"])
 
 
 def _svc(request: Request) -> DynamoAdminService:

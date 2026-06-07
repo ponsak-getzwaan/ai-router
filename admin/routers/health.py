@@ -11,7 +11,7 @@ from admin.models import ServiceHealth
 from admin.services.redis_admin import RedisAdminService
 from shared.logging import safe_log
 
-router = APIRouter(prefix="/admin", tags=["health"])
+router = APIRouter(prefix="/admin/api", tags=["health"])
 
 
 @router.get("/health", response_model=ServiceHealth)

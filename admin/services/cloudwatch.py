@@ -37,6 +37,11 @@ def _safe_avg(datapoints: list[dict[str, Any]]) -> float | None:
     return sum(pts) / len(pts) if pts else None
 
 
+def _safe_extended_avg(datapoints: list[dict[str, Any]], stat: str) -> float | None:
+    pts = [d["ExtendedStatistics"][stat] for d in datapoints if stat in d.get("ExtendedStatistics", {})]
+    return sum(pts) / len(pts) if pts else None
+
+
 def _rate_pct(numerator: float, denominator: float) -> float | None:
     if denominator == 0:
         return None
@@ -58,17 +63,22 @@ class CloudWatchService:
         end: datetime,
         dimensions: list[dict[str, str]] | None = None,
     ) -> list[dict[str, Any]]:
+        is_extended = stat.startswith("p") or stat.startswith("tm")
         try:
             async with self._session.client("cloudwatch", region_name=self._region) as cw:
-                resp = await cw.get_metric_statistics(
+                kwargs: dict[str, Any] = dict(
                     Namespace=self._ns,
                     MetricName=metric_name,
                     Dimensions=dimensions or [],
                     StartTime=start,
                     EndTime=end,
                     Period=period_seconds,
-                    Statistics=[stat],
                 )
+                if is_extended:
+                    kwargs["ExtendedStatistics"] = [stat]
+                else:
+                    kwargs["Statistics"] = [stat]
+                resp = await cw.get_metric_statistics(**kwargs)
                 return cast(list[dict[str, Any]], resp.get("Datapoints", []))
         except Exception as exc:
             safe_log.warning(
@@ -112,7 +122,7 @@ class CloudWatchService:
             escalation_rate_pct=_rate_pct(escalations, total),
             latency_ms=LatencyPercentiles(
                 p50=_safe_avg(latency_pts),
-                p99=_safe_avg(p99_pts),
+                p99=_safe_extended_avg(p99_pts, "p99"),
                 p999=None,
             ),
         )

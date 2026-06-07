@@ -297,7 +297,7 @@ export function TestConsole() {
     reset({ ...values, message: "" });
 
     try {
-      const raw = await apiFetch<unknown>("/admin/test-console", {
+      const raw = await apiFetch<unknown>("/admin/api/test-console", {
         method: "POST",
         body: JSON.stringify({
           message: userMessage,

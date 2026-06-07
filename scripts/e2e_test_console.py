@@ -49,7 +49,7 @@ async def call_console(
     }
     t0 = time.monotonic()
     async with httpx.AsyncClient(timeout=70.0, verify=False) as client:
-        resp = await client.post(f"{CF_BASE}/admin/test-console", headers=headers, json=body)
+        resp = await client.post(f"{CF_BASE}/admin/api/test-console", headers=headers, json=body)
     elapsed = time.monotonic() - t0
 
     print(f"\n--- '{message}' [{elapsed:.1f}s] HTTP {resp.status_code} ---")

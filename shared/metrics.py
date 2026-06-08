@@ -102,4 +102,49 @@ async def emit_strategist(plan: "RoutingPlan", region: str) -> None:
     await _emit(data, region)
 
 
-__all__ = ["emit_classifier", "emit_strategist"]
+async def emit_orchestrator(
+    latency_ms: float,
+    *,
+    error: bool,
+    escalated: bool,
+    region: str,
+) -> None:
+    """Emit pipeline-level metrics read by the Pipeline Health dashboard.
+
+    Always emits RequestCount and RequestLatencyMs with Layer=orchestrator.
+    Emits ErrorCount when the pipeline raised an unhandled exception.
+    Emits EscalationCount (no dimension) when the request was escalated at
+    the Bouncer or Classifier layer.
+    """
+    data: list[dict[str, Any]] = [
+        {
+            "MetricName": "RequestCount",
+            "Dimensions": [{"Name": "Layer", "Value": "orchestrator"}],
+            "Value": 1,
+            "Unit": "Count",
+        },
+        {
+            "MetricName": "RequestLatencyMs",
+            "Dimensions": [{"Name": "Layer", "Value": "orchestrator"}],
+            "Value": latency_ms,
+            "Unit": "Milliseconds",
+        },
+    ]
+    if error:
+        data.append({
+            "MetricName": "ErrorCount",
+            "Dimensions": [{"Name": "Layer", "Value": "orchestrator"}],
+            "Value": 1,
+            "Unit": "Count",
+        })
+    if escalated:
+        data.append({
+            "MetricName": "EscalationCount",
+            "Dimensions": [],
+            "Value": 1,
+            "Unit": "Count",
+        })
+    await _emit(data, region)
+
+
+__all__ = ["emit_classifier", "emit_orchestrator", "emit_strategist"]

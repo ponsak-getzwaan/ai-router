@@ -40,7 +40,7 @@ from orchestrator.presidio_client import PresidioClient
 from orchestrator.vault import TokenVault
 from shared.errors import PresidioError
 from shared.logging import safe_log
-from shared.metrics import emit_classifier, emit_strategist
+from shared.metrics import emit_classifier, emit_orchestrator, emit_strategist
 from shared.models import (
     BounceResult,
     ClassifiedIntent,
@@ -198,6 +198,20 @@ class PipelineDriver:
             return "An unexpected error occurred."
 
         finally:
+            latency_ms = (time.monotonic() - start) * 1000
+            was_escalated = (bounce is not None and bounce.escalate) or (
+                intent is not None and intent.escalate
+            )
+            region = envelope.bedrock_region if envelope is not None else self._aws_region
+            asyncio.create_task(
+                emit_orchestrator(
+                    latency_ms,
+                    error=error_type is not None,
+                    escalated=was_escalated,
+                    region=region,
+                )
+            )
+
             # Step 10: Audit — always runs
             if envelope is not None:
                 await self._audit.write(

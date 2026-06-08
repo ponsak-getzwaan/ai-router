@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import fakeredis.aioredis  # type: ignore[import-untyped]
+import pytest
 
 from orchestrator.pipeline_driver import PipelineDriver
 from shared.errors import PresidioError
@@ -28,6 +29,25 @@ from shared.models import (
     RoutingPlan,
     StrategistPath,
 )
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def mock_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch all fire-and-forget metric emitters so no pending tasks leak into teardown."""
+    monkeypatch.setattr(
+        "orchestrator.pipeline_driver.emit_orchestrator", AsyncMock()
+    )
+    monkeypatch.setattr(
+        "orchestrator.pipeline_driver.emit_classifier", AsyncMock()
+    )
+    monkeypatch.setattr(
+        "orchestrator.pipeline_driver.emit_strategist", AsyncMock()
+    )
+
 
 # =============================================================================
 # Constants

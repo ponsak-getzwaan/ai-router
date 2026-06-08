@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from unittest.mock import AsyncMock, MagicMock
 
+_EMBED_BATCH = 90  # must match EmbeddingFastPath._embed _BATCH constant
+
 import pytest
 
 from classifier.config import ClassifierConfig
@@ -56,11 +58,18 @@ def _uniform_vec() -> list[float]:
 
 
 def _exemplar_side_effects() -> list[dict]:
-    """The 5 Bedrock responses that initialize() expects, one per domain."""
-    return [
-        {"embeddings": [_unit_vec(domain)] * len(_EXEMPLARS[domain])}
-        for domain in _DOMAIN_ORDER
-    ]
+    """Mock Bedrock responses for initialize(), one entry per batch call.
+
+    Domains with > _EMBED_BATCH exemplars require multiple calls; this
+    generates one response per batch so the side_effect list never runs dry.
+    """
+    effects = []
+    for domain in _DOMAIN_ORDER:
+        n = len(_EXEMPLARS[domain])
+        for batch_start in range(0, n, _EMBED_BATCH):
+            batch_size = min(_EMBED_BATCH, n - batch_start)
+            effects.append({"embeddings": [_unit_vec(domain)] * batch_size})
+    return effects
 
 
 # ---------------------------------------------------------------------------
@@ -139,11 +148,14 @@ class TestIsFollowup:
 
 
 class TestInitialize:
-    async def test_calls_bedrock_once_per_domain(self, config, bedrock_mock):
+    async def test_calls_bedrock_at_least_once_per_domain(self, config, bedrock_mock):
         bedrock_mock.invoke_model.side_effect = _exemplar_side_effects()
         fp = EmbeddingFastPath(config, bedrock_mock)
         await fp.initialize()
-        assert bedrock_mock.invoke_model.call_count == len(_DOMAIN_ORDER)
+        expected = sum(
+            math.ceil(len(_EXEMPLARS[d]) / _EMBED_BATCH) for d in _DOMAIN_ORDER
+        )
+        assert bedrock_mock.invoke_model.call_count == expected
 
     async def test_uses_cohere_model_id(self, config, bedrock_mock):
         bedrock_mock.invoke_model.side_effect = _exemplar_side_effects()
@@ -159,13 +171,21 @@ class TestInitialize:
         for c in bedrock_mock.invoke_model.call_args_list:
             assert c.args[1]["input_type"] == "search_document"
 
-    async def test_correct_exemplar_count_sent_per_domain(self, config, bedrock_mock):
+    async def test_total_exemplar_texts_sent_per_domain(self, config, bedrock_mock):
         bedrock_mock.invoke_model.side_effect = _exemplar_side_effects()
         fp = EmbeddingFastPath(config, bedrock_mock)
         await fp.initialize()
-        for i, domain in enumerate(_DOMAIN_ORDER):
-            body = bedrock_mock.invoke_model.call_args_list[i].args[1]
-            assert len(body["texts"]) == len(_EXEMPLARS[domain])
+        # Sum texts across all calls to verify the right total was sent per domain.
+        call_idx = 0
+        for domain in _DOMAIN_ORDER:
+            n = len(_EXEMPLARS[domain])
+            n_batches = math.ceil(n / _EMBED_BATCH)
+            texts_sent = sum(
+                len(bedrock_mock.invoke_model.call_args_list[call_idx + b].args[1]["texts"])
+                for b in range(n_batches)
+            )
+            assert texts_sent == n
+            call_idx += n_batches
 
     async def test_all_domains_loaded_after_initialize(self, config, bedrock_mock):
         bedrock_mock.invoke_model.side_effect = _exemplar_side_effects()

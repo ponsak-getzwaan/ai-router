@@ -177,6 +177,16 @@ _EXEMPLARS: dict[IntentDomain, list[str]] = {
         "what is included in my current package?",
         "can check my account status or not?",
         "how do I cancel my subscription?",
+        # Account access / credentials
+        "how do I reset my password?",
+        "I forgot my password, how do I recover access?",
+        "how do I change my login email?",
+        "how do I update my account email address?",
+        "how do I recover my account?",
+        "my account is locked, what do I do?",
+        "how do I enable two-factor authentication?",
+        "can you help me reset my password?",
+        "I cannot log in to my account",
         # Product facts
         "what features are included in the basic plan?",
         "does this support integration with Slack?",
@@ -675,7 +685,7 @@ class EmbeddingFastPath:
             return None
 
         try:
-            query_vectors = await self._embed([message], input_type="classification")
+            query_vectors = await self._embed([message], input_type="search_query")
         except BedrockError as exc:
             safe_log.warning("classifier.fast_path.embed_error", error_type=type(exc).__name__)
             return None

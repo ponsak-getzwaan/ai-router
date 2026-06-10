@@ -17,16 +17,14 @@ _BLOCKED_INTENTS: frozenset[str] = frozenset(
     }
 )
 
-# Approved vendor prefix: apac.* inference profiles are Singapore-resident.
-_APAC_PREFIX = "apac."
+# Approved inference profile prefixes.
+# apac.*   — Singapore-resident profiles
+# global.* — global cross-region profiles (compute may route outside ap-southeast-1)
+# us.*     — US East profiles (required to support Meta, Mistral, and other vendors
+#            that have no APAC inference profiles)
+_APPROVED_PREFIXES: frozenset[str] = frozenset({"apac.", "global.", "us."})
 
-# Global profiles explicitly approved despite routing outside ap-southeast-1.
-# Each entry requires a deliberate product-owner decision (data-residency trade-off).
-_APPROVED_GLOBAL_VENDORS: frozenset[str] = frozenset(
-    {"global.anthropic.claude-sonnet-4-6"}
-)
-
-# Fallback for all other non-resident vendors.
+# Fallback for unrecognised vendor strings (typos, stale config, etc.).
 _SG_FALLBACK_VENDOR = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 
@@ -45,8 +43,8 @@ def apply_policies(
     blocked = False
     primary_vendor = plan.primary_vendor
 
-    # Data residency — reroute vendors that are neither APAC-resident nor explicitly approved
-    if not primary_vendor.startswith(_APAC_PREFIX) and primary_vendor not in _APPROVED_GLOBAL_VENDORS:
+    # Reroute vendors that don't match any approved inference profile prefix
+    if not any(primary_vendor.startswith(p) for p in _APPROVED_PREFIXES):
         safe_log.warning(
             "policy.sg_residency.rerouted",
             original_vendor=primary_vendor,

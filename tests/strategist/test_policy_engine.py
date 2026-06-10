@@ -25,8 +25,10 @@ from strategist.policy_engine import apply_policies
 # Vendor IDs (same as in policy_engine.py)
 # ---------------------------------------------------------------------------
 
-_HAIKU = "apac.anthropic.claude-3-haiku-20240307-v1:0"
-_SONNET = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
+_HAIKU    = "apac.anthropic.claude-3-haiku-20240307-v1:0"
+_SONNET   = "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
+_GLOBAL   = "global.anthropic.claude-sonnet-4-6"
+_US_LLAMA = "us.meta.llama4-scout-17b-instruct-v1:0"
 _UNAPPROVED = "openai/gpt-4"
 
 
@@ -111,6 +113,18 @@ class TestDataResidency:
         # Residency rerouting is not a block — request still proceeds
         plan = apply_policies(_make_plan(_UNAPPROVED), _make_envelope(), _make_intent())
         assert plan.blocked is False
+
+    def test_global_vendor_no_modification(self):
+        plan = apply_policies(_make_plan(_GLOBAL), _make_envelope(), _make_intent())
+        assert plan.policy_modified is False
+        assert plan.primary_vendor == _GLOBAL
+        assert plan.applied_policies == ()
+
+    def test_us_vendor_no_modification(self):
+        plan = apply_policies(_make_plan(_US_LLAMA), _make_envelope(), _make_intent())
+        assert plan.policy_modified is False
+        assert plan.primary_vendor == _US_LLAMA
+        assert plan.applied_policies == ()
 
 
 # ---------------------------------------------------------------------------

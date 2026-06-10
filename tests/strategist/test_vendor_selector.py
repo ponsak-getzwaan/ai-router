@@ -54,6 +54,11 @@ def _bedrock_vendor_response(vendor: str) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": json.dumps(payload)}]}
 
 
+def _bedrock_intent_response(intent: str) -> dict[str, Any]:
+    payload = {"intent": intent, "reasoning": "test"}
+    return {"content": [{"type": "text", "text": json.dumps(payload)}]}
+
+
 def _make_dynamo_session(item: dict[str, Any] | None = None) -> MagicMock:
     """Build a mock aioboto3 session whose DynamoDB table.get_item returns item."""
     table_mock = MagicMock()
@@ -229,19 +234,22 @@ class TestDeterministicPath:
 
 
 class TestHaikuArbitration:
-    async def test_haiku_arbitration_uses_bedrock_vendor(self, config, bedrock_mock):
-        bedrock_mock.invoke_model.return_value = _bedrock_vendor_response(_HAIKU)
-        selector = _make_selector(bedrock_mock, config=config)
-        vendor, _path = await selector.select(_make_intent(confidence=0.7))
+    async def test_haiku_refined_intent_drives_dynamo_lookup(self, config, bedrock_mock):
+        # Haiku refines "general_qa" → "simple_transactional"; DynamoDB returns _HAIKU
+        bedrock_mock.invoke_model.return_value = _bedrock_intent_response("simple_transactional")
+        session = _make_dynamo_session({"vendor": _HAIKU, "intent": "simple_transactional"})
+        selector = _make_selector(bedrock_mock, session, config)
+        vendor, _path = await selector.select(_make_intent("general_qa", confidence=0.7))
         assert vendor == _HAIKU
 
     async def test_haiku_arbitration_calls_bedrock(self, config, bedrock_mock):
-        bedrock_mock.invoke_model.return_value = _bedrock_vendor_response(_SONNET)
+        bedrock_mock.invoke_model.return_value = _bedrock_intent_response("general_qa")
         selector = _make_selector(bedrock_mock, config=config)
         await selector.select(_make_intent(confidence=0.7))
         bedrock_mock.invoke_model.assert_called_once()
 
     async def test_haiku_arbitration_falls_back_on_bedrock_error(self, config, bedrock_mock):
+        # Haiku errors → refined_intent stays as original → _deterministic → local map
         bedrock_mock.invoke_model.side_effect = BedrockError("ServiceUnavailable")
         selector = _make_selector(bedrock_mock, config=config)
         vendor, path = await selector.select(
@@ -252,6 +260,7 @@ class TestHaikuArbitration:
         assert vendor == expected
 
     async def test_haiku_arbitration_falls_back_on_malformed_json(self, config, bedrock_mock):
+        # Bad JSON → refined_intent stays as original → _deterministic → local map
         bedrock_mock.invoke_model.return_value = {
             "content": [{"type": "text", "text": "not valid json"}]
         }
@@ -262,8 +271,8 @@ class TestHaikuArbitration:
         expected = _INTENT_TO_VENDOR.get("simple_transactional", config.default_vendor)
         assert vendor == expected
 
-    async def test_haiku_arbitration_falls_back_on_missing_vendor_key(self, config, bedrock_mock):
-        # Response JSON doesn't have "vendor" key → falls back
+    async def test_haiku_arbitration_missing_intent_key_uses_original(self, config, bedrock_mock):
+        # Response JSON has no "intent" key → original intent used → _deterministic → local map
         bedrock_mock.invoke_model.return_value = {
             "content": [{"type": "text", "text": json.dumps({"reasoning": "hmm"})}]
         }
@@ -271,8 +280,8 @@ class TestHaikuArbitration:
         vendor, _path = await selector.select(
             _make_intent("general_qa", confidence=0.7)
         )
-        # Should return default_vendor since "vendor" key missing
-        assert vendor == config.default_vendor
+        expected = _INTENT_TO_VENDOR.get("general_qa", config.default_vendor)
+        assert vendor == expected
 
 
 # ---------------------------------------------------------------------------

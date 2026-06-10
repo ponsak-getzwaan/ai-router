@@ -19,8 +19,9 @@ from shared.logging import safe_log
 from shared.models import ClassifiedIntent, StrategistPath
 
 _HAIKU_SYSTEM = (
-    "You select the best AI vendor for a classified user intent. "
-    'Reply with JSON only: {"vendor": "<inference_profile_id>", "reasoning": "<short_code>"}'
+    "You confirm or correct an intent classification for a user message. "
+    "Valid intents: code_assistance, general_qa, simple_transactional, out_of_scope, ambiguous. "
+    'Reply with JSON only: {"intent": "<intent_name>", "reasoning": "<short_code>"}'
 )
 
 _INTENT_TO_VENDOR: dict[str, str] = {
@@ -83,6 +84,11 @@ class VendorSelector:
         return vendor
 
     async def _haiku_arbitrate(self, intent: ClassifiedIntent) -> str:
+        """Use Haiku to confirm/refine the intent, then look up vendor from routing rules.
+
+        Haiku never picks the vendor directly — that always comes from DynamoDB so that
+        admin-configured routing rules are respected regardless of confidence level.
+        """
         body: dict[str, Any] = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": self._config.haiku_max_tokens,
@@ -97,14 +103,14 @@ class VendorSelector:
                 }
             ],
         }
+        refined_intent = intent.intent
         try:
             response = await self._bedrock.invoke_model(self._config.haiku_model_id, body)
             text: str = response["content"][0]["text"]
             parsed: dict[str, Any] = json.loads(text)
-            vendor = str(parsed.get("vendor", self._config.default_vendor))
-            safe_log.info("strategist.haiku.verdict", vendor=vendor)
-            return vendor
+            refined_intent = str(parsed.get("intent", intent.intent))
+            safe_log.info("strategist.haiku.verdict", refined_intent=refined_intent)
         except (BedrockError, KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
             safe_log.warning("strategist.haiku.error", error_type=type(exc).__name__)
-            default: str = self._config.default_vendor
-            return _INTENT_TO_VENDOR.get(intent.intent, default)
+
+        return await self._deterministic(refined_intent)

@@ -43,6 +43,10 @@ def apply_policies(
     blocked = False
     primary_vendor = plan.primary_vendor
 
+    # Escalate sentinel passes through unchanged — no residency check needed
+    if primary_vendor == "escalate":
+        return plan
+
     # Reroute vendors that don't match any approved inference profile prefix
     if not any(primary_vendor.startswith(p) for p in _APPROVED_PREFIXES):
         safe_log.warning(

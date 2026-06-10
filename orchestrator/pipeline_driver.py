@@ -154,7 +154,12 @@ class PipelineDriver:
             history_turns_count = len(history_turns) if history_turns else 0
             intent = await self._classifier.classify(envelope, history=history_turns or None)
             asyncio.create_task(emit_classifier(intent, envelope.bedrock_region))
-            if intent.escalate:
+
+            # Step 7: Strategist — always runs so routing rules can override escalation
+            plan = await self._strategist.route(envelope, intent)
+            asyncio.create_task(emit_strategist(plan, envelope.bedrock_region))
+
+            if plan.primary_vendor == "escalate":
                 safe_log.info(
                     "pipeline.escalated",
                     intent=intent.intent,
@@ -164,9 +169,6 @@ class PipelineDriver:
                 await self._send_escalation(envelope, bounce)
                 return "Your request has been sent for human review."
 
-            # Step 7: Strategist
-            plan = await self._strategist.route(envelope, intent)
-            asyncio.create_task(emit_strategist(plan, envelope.bedrock_region))
             if plan.blocked:
                 safe_log.info("pipeline.policy_blocked", blocked=True)
                 return "This request cannot be processed due to compliance restrictions."
@@ -200,7 +202,7 @@ class PipelineDriver:
         finally:
             latency_ms = (time.monotonic() - start) * 1000
             was_escalated = (bounce is not None and bounce.escalate) or (
-                intent is not None and intent.escalate
+                plan is not None and plan.primary_vendor == "escalate"
             )
             region = envelope.bedrock_region if envelope is not None else self._aws_region
             asyncio.create_task(

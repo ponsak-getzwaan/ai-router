@@ -31,6 +31,22 @@ class Strategist:
     ) -> RoutingPlan:
         vendor, path = await self._selector.select(intent)
 
+        # Escalate sentinel — routing rule says "send to human review"
+        if vendor == "escalate":
+            safe_log.info("strategist.plan", primary_vendor="escalate", path=path,
+                          blocked=False, policy_modified=False, applied_policies=())
+            return RoutingPlan(
+                primary_vendor="escalate",
+                fallback_chain=(),
+                context=RoutingContext(
+                    bedrock_region=self._config.bedrock_region,
+                    timeout_seconds=self._config.sonnet_timeout_s,
+                    max_retries=0,
+                    streaming=False,
+                ),
+                path=path,
+            )
+
         # Build timeout/context based on the selected vendor
         is_haiku = _HAIKU_ID in vendor
         timeout_s = self._config.haiku_timeout_s if is_haiku else self._config.sonnet_timeout_s

@@ -254,6 +254,7 @@ function EditorForm({ rule, intent, vendorGroups }: EditorFormProps) {
             id="vendor"
             {...register("vendor", { required: "Required" })}
           >
+            <option value="escalate">— no primary vendor (escalate to human review) —</option>
             <VendorOptGroups groups={vendorGroups} />
           </NativeSelect>
           {errors.vendor && (

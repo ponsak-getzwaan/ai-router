@@ -37,9 +37,13 @@ RULES = [
     },
     {
         "intent": "ambiguous",
-        "vendor": _SONNET,
-        "fallback": _HAIKU,
-        "description": "Ambiguous intent — use Sonnet for best chance of a useful response",
+        "vendor": "escalate",
+        "description": "Intent cannot be determined — escalate to human review by default",
+    },
+    {
+        "intent": "out_of_scope",
+        "vendor": "escalate",
+        "description": "Request outside system scope — escalate to human review by default",
     },
 ]
 

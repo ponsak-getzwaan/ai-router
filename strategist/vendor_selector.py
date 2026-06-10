@@ -25,9 +25,11 @@ _HAIKU_SYSTEM = (
 )
 
 _INTENT_TO_VENDOR: dict[str, str] = {
-    "code_assistance": "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
-    "general_qa": "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "code_assistance":      "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "general_qa":           "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
     "simple_transactional": "apac.anthropic.claude-3-haiku-20240307-v1:0",
+    "ambiguous":            "escalate",
+    "out_of_scope":         "escalate",
 }
 
 

@@ -25,7 +25,7 @@ export function useRoutingRule(intent: string) {
   return useQuery({
     queryKey: ruleKey(intent),
     queryFn: async (): Promise<RoutingRule> => {
-      const raw = await apiFetch<unknown>(`/admin/routing-rules/${encodeURIComponent(intent)}`);
+      const raw = await apiFetch<unknown>(`/admin/api/routing-rules/${encodeURIComponent(intent)}`);
       return RoutingRuleSchema.parse(raw);
     },
     staleTime: 60_000,
@@ -36,7 +36,7 @@ export function useUpdateRoutingRule(intent: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: RoutingRuleUpdate) =>
-      apiFetch<RoutingRule>(`/admin/routing-rules/${encodeURIComponent(intent)}`, {
+      apiFetch<RoutingRule>(`/admin/api/routing-rules/${encodeURIComponent(intent)}`, {
         method: "PUT",
         body: JSON.stringify({
           vendor: body.vendor,
